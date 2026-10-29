@@ -1,4 +1,5 @@
 """Storage test: python -m atlas.storage_check. Must print PASS before anything else is built."""
+import os
 import sys
 from pathlib import Path
 
@@ -11,11 +12,12 @@ PAYLOAD = {"hello": "atlas"}
 
 
 def _local_files() -> set[str]:
-    return {
-        str(p.relative_to(ROOT))
-        for p in ROOT.rglob("*")
-        if p.is_file() and not (SKIP_DIRS & set(p.relative_to(ROOT).parts))
-    }
+    """All files under the project root, pruning .venv/.git/caches so the walk stays fast."""
+    found: set[str] = set()
+    for dirpath, dirnames, filenames in os.walk(ROOT):
+        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+        found.update(str((Path(dirpath) / f).relative_to(ROOT)) for f in filenames)
+    return found
 
 
 def main() -> int:
