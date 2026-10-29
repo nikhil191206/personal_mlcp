@@ -21,13 +21,13 @@
   crawl_delay: null
   notes: "RSS feed with 25 current entries. Terms and Conditions page read: no clause on automated access."
 
-- source_id: atlas_copco_usa_news
-  name: Atlas Copco USA (local news and updates)
-  url: https://www.atlascopco.com/en-us/news/latest-news
+- source_id: quincy_compressor_blog
+  name: Quincy Compressor (blog)
+  url: https://www.quincycompressor.com/blog/
   type: competitor
-  access_method: html
-  feed_url: null
-  item_url_pattern: '^https://www\.atlascopco\.com/en-us/news/latest-news/[a-z0-9-]+/?$'
+  access_method: rss
+  feed_url: https://www.quincycompressor.com/feed/
+  item_url_pattern: null
   robots_status: allowed
   terms_status: ok
   vetting_status: working
@@ -35,8 +35,8 @@
   review_date: 2026-10-29
   region: US
   licence_note: "Public web page; facts and links only"
-  crawl_delay: 1
-  notes: "The client's own newsroom, included to show how Atlas Copco describes its own news. No RSS. robots.txt Crawl-delay is 1 s; we use at least 3 s. Legal & Privacy Notices page has no clause on automated access."
+  crawl_delay: null
+  notes: "US compressor maker (Alabama). RSS feed with dated posts (newest 19 Oct 2026). Website Terms of Use, Terms & Conditions and Legal Notice pages read: no clause on automated access. Posts are mostly educational, so most are 'claim' items."
 
 - source_id: sullair_america_news
   name: Sullair (Hitachi Global Air Power) US news
@@ -55,22 +55,22 @@
   crawl_delay: null
   notes: "No RSS. The global site (www.sullair.com) has no news section; the US site (america.sullair.com) does. Terms of Use page read: no clause on automated access."
 
-- source_id: kaeser_usa_blog
-  name: Kaeser Compressors USA (Kaeser Talks Shop blog)
-  url: https://us.kaeser.com/compressed-air-resources/kaeser-talks-shop/
-  type: competitor
-  access_method: html
-  feed_url: null
-  item_url_pattern: '^https://us\.kaeser\.com/compressed-air-resources/kaeser-talks-shop/(?!(?:\d{4}|air-compressors|air-treatment|blowers|controls|education|installation-nightmares|piping-and-storage|portable-compressors|system-efficiency|authors|default)\.aspx)[a-z0-9-]+\.aspx$'
+- source_id: pumps_systems_news
+  name: Pumps & Systems (industry news)
+  url: https://www.pumpsandsystems.com/news/
+  type: trade_news
+  access_method: rss
+  feed_url: https://www.pumpsandsystems.com/feed/
+  item_url_pattern: null
   robots_status: allowed
-  terms_status: unknown
+  terms_status: ok
   vetting_status: working
   status: proposed
   review_date: 2026-10-29
   region: US
   licence_note: "Public web page; facts and links only"
   crawl_delay: null
-  notes: "The press-release page lists no individual release links, so the blog is used. No RSS. No terms-of-use page found (only a Legal notice, which has no automation clause): Atlas Copco Legal should confirm."
+  notes: "US trade publication (Cahaba Media Group) for pumps and rotating equipment. RSS feed with current dated news (newest 27 Oct 2026), including company appointments and acquisitions. Terms page (Data Privacy) and Privacy Policy read: no clause on automated access. Covers more than compressors, so the relevance filter will drop many items."
 
 - source_id: doe_newsroom
   name: US Department of Energy newsroom

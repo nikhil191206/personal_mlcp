@@ -2,16 +2,16 @@
 
 Checked on **2026-10-29** with the procedure in `parent.md` section 11. Agent used for every request: `AtlasCopcoStudentPoC/0.1 (+contact: industrymlcp@gmail.com)`, at least 3 s between requests, nothing saved to disk. Per source we fetched: `/robots.txt`, the homepage (to find news, feed and terms links), the terms page, and then one listing and one article through our own Compliance Gate and Collector.
 
-**Result: 13 candidates vetted. 7 `working` (5 proposed, 2 held in reserve), 3 `blocked` by their terms, 3 `unreachable` (the site refuses our agent without a ban).** Nothing was worked around. All sources stay `proposed` until Atlas Copco approves them; Atlas Copco's Legal team should review the list before go-live.
+**Result: 15 candidates vetted. 9 `working` (5 proposed, 4 vetted but not used), 3 `blocked` by their terms, 3 `unreachable` (the site refuses our agent without a ban).** After the first live runs two proposed sources were replaced: Atlas Copco USA (the client's own newsroom adds nothing to a study of the market) and the Kaeser USA blog (its posts carry no publication date, so none can pass the "recent" check). Quincy Compressor and Pumps & Systems took their places. Nothing was worked around. All sources stay `proposed` until Atlas Copco approves them; Atlas Copco's Legal team should review the list before go-live.
 
 ## Summary table
 
 | # | source_id | name | type | access | robots | terms | public | test fetch | vetting_status | in register |
 |---|---|---|---|---|---|---|---|---|---|---|
 | 1 | airbestpractices_news | Compressed Air Best Practices | trade_news | rss | allowed | ok | yes | listing 25 entries, article 200 | **working** | proposed |
-| 2 | atlas_copco_usa_news | Atlas Copco USA news | competitor (client) | html | allowed (crawl-delay 1) | ok | yes | listing 7 links, article 200 | **working** | proposed |
+| 2 | atlas_copco_usa_news | Atlas Copco USA news | competitor (client) | html | allowed (crawl-delay 1) | ok | yes | listing 7 links, article 200 | working | **not used** (client's own site) |
 | 3 | sullair_america_news | Sullair US news | competitor | html | allowed | ok | yes | listing 10 links, article 200 | **working** | proposed |
-| 4 | kaeser_usa_blog | Kaeser USA blog | competitor | html | allowed | unknown | yes | listing 11 links, article 200 | **working** | proposed |
+| 4 | kaeser_usa_blog | Kaeser USA blog | competitor | html | allowed | unknown | yes | listing 11 links, article 200 | working | **not used** (posts have no date) |
 | 5 | doe_newsroom | US DOE newsroom | government | html | allowed | ok | yes | listing 14 links, article 200 | **working** | proposed |
 | 6 | cagi_news | CAGI | trade_news | html | allowed | **forbids automation** | yes | not fetched (terms ban) | **blocked** | blocked |
 | 7 | prnewswire_releases | PR Newswire | trade_news | html | allowed | **forbids automation** | yes | not fetched (terms ban) | **blocked** | blocked |
@@ -22,17 +22,22 @@ Checked on **2026-10-29** with the procedure in `parent.md` section 11. Agent us
 | 12 | atlas_copco_group_press | Atlas Copco Group press releases | competitor (client) | html | allowed (crawl-delay 1) | ok | yes | homepage lists 4 recent releases | working, **reserve** | not in register |
 | 13 | elgi_usa | ELGi US | competitor | rss | allowed | unknown | yes | feed 10 entries (mostly product pages) | working, **reserve** | not in register |
 
-Rows 1-11 are in `config/sources.yaml`. Rows 12-13 are vetted and can be added by copying a row if Atlas Copco wants them.
+| 14 | quincy_compressor_blog | Quincy Compressor blog | competitor | rss | allowed | ok | yes | feed 10 dated entries, post 200 | **working** | proposed |
+| 15 | pumps_systems_news | Pumps & Systems news | trade_news | rss | allowed | ok | yes | feed 12 dated entries, article 200 | **working** | proposed |
+
+The proposed five are rows 1, 3, 5, 14 and 15. The register `config/sources.yaml` holds those five plus the six blocked or unreachable sources (rows 6-11). Rows 2, 4, 12 and 13 are vetted but not in the register; copy a row back if Atlas Copco wants one.
 
 ## Proposed five and why
 
-Mix of 3 competitor newsrooms, 1 trade news and 1 government page, as the spec asks.
+Mix of 2 trade news sources, 2 competitors and 1 government page, as the spec asks.
 
-- **Compressed Air Best Practices:** the only trade source we could use; has an RSS feed, current industry news (the newest entry is dated 28 Oct 2026), and is entirely about compressed air.
-- **Atlas Copco USA:** the client's own newsroom; shows how they describe their news and which items they already know.
-- **Sullair US:** a major US compressor brand (Hitachi Global Air Power) with a news section.
-- **Kaeser USA:** a major compressor brand; its press-release page lists no individual releases, so we use its blog (educational and product content, `claim` by default). Terms status is `unknown`, flagged for Legal.
-- **DOE newsroom:** government source; mostly general energy news, so the relevance filter will drop most items, which demonstrates the filter on a real feed. Optional by the spec.
+- **Compressed Air Best Practices:** the strongest source; RSS feed, current industry news (newest entry 28 Oct 2026), entirely about compressed air.
+- **Quincy Compressor:** a US compressor maker (Alabama) with a dated RSS feed; mostly educational posts, so mostly `claim` items.
+- **Sullair US:** a major US compressor brand (Hitachi Global Air Power) with a news section and dated press releases.
+- **Pumps & Systems:** US trade publication with a current dated feed (newest 27 Oct 2026) covering company appointments and acquisitions, including Atlas Copco items. It covers pumps and rotating equipment generally, so the filter drops most items; in a 6-item sample none passed.
+- **DOE newsroom:** government source; general energy news, so the filter drops nearly everything. It shows the relevance filter working on a real feed. Optional by the spec.
+
+Expect the useful results to come mainly from the first three. The last two are included for variety and to show the filter, not for volume.
 
 ## Details per candidate
 
@@ -52,7 +57,7 @@ Mix of 3 competitor newsrooms, 1 trade news and 1 government page, as the spec a
 - Feed/API: none found (listing is an HTML page with paging)
 - Public, logged-out: yes
 - Test fetch: listing https://www.atlascopco.com/en-us/news/latest-news 200 (7 article links on page 1); one article 200
-- Status: **working** — reason: HTML listing, no restriction found. Note: the client's own site, so its content is `claim`.
+- Status: **working**, but **not used**: it is the client's own newsroom, which adds nothing to a study of what others are building. Removed from the register after the first live run.
 
 ### 3. Sullair US (sullair_america_news)
 - Checked on: 2026-10-29
@@ -70,7 +75,7 @@ Mix of 3 competitor newsrooms, 1 trade news and 1 government page, as the spec a
 - Feed/API: none found. https://us.kaeser.com/about-us/press/press-releases/ lists no individual release links in its HTML, so the "Kaeser Talks Shop" blog is used instead
 - Public, logged-out: yes
 - Test fetch: blog index 200 (11 post links after excluding category and year pages); one post 200
-- Status: **working** — caveat: terms unknown; blog posts are mostly evergreen articles, so many may fail the 12-month "recent" check
+- Status: **working**, but **not used**: in the first live run none of its posts showed a publication date, so none could pass the 12-month "recent" check. Removed from the register. Terms are also `unknown`.
 
 ### 5. US DOE newsroom (doe_newsroom)
 - Checked on: 2026-10-29
@@ -153,7 +158,25 @@ Mix of 3 competitor newsrooms, 1 trade news and 1 government page, as the spec a
 - Test fetch: feed 200
 - Status: **working (limited)** — held in reserve: the feed carries product pages, not news.
 
-Also looked at and dropped before full vetting: Quincy Compressor (www.quincycompressor.com; robots allow, but no news listing on the homepage).
+### 14. Quincy Compressor blog (quincy_compressor_blog)
+- Checked on: 2026-10-29
+- robots.txt: https://www.quincycompressor.com/robots.txt -> allowed for `*`; crawl-delay: none
+- Terms: Website Terms of Use and Privacy Notice, Terms & Conditions and Legal Notice (https://www.quincycompressor.com/about-us/website-terms-of-use-and-privacy-notice/, /terms-conditions/, /about-us/legal-notice/) -> all three read in full (23,000 to 60,000 characters each); no sentence on scraping, robots or automated access -> ok
+- Feed/API: https://www.quincycompressor.com/feed/ (10 entries with dates, newest 19 Oct 2026)
+- Public, logged-out: yes
+- Test fetch: feed 200; posts 200
+- Status: **working**
+
+### 15. Pumps & Systems (pumps_systems_news)
+- Checked on: 2026-10-29
+- robots.txt: https://www.pumpsandsystems.com/robots.txt -> allowed for `*`; crawl-delay: none
+- Terms: "Terms of Use" link in the footer leads to https://www.pumpsandsystems.com/data-privacy/; with the Privacy Policy (https://www.pumpsandsystems.com/privacy-policy/) read in full -> no sentence on scraping, robots or automated access -> ok
+- Feed/API: https://www.pumpsandsystems.com/feed/ (12 entries with dates, newest 27 Oct 2026). The compressors-only category feed is stale (newest Dec 2025), so the main feed is used
+- Public, logged-out: yes
+- Test fetch: feed 200; articles 200
+- Status: **working** — caveat: most items are about pumps, not compressors
+
+Also looked at and dropped before full vetting: FS-Elliott (feed carries product brochures, not news), Powerex (feed stale, newest Feb 2024), Kaishan USA (feed returned HTTP 403, not retried), ELGi US (its `/news/` page redirects to a resources page with no news list), and several trade-magazine feeds that returned HTTP 403 (IEN, Power Engineering, Chemical Engineering, Manufacturing.net; not retried).
 
 ## Findings for the meeting
 

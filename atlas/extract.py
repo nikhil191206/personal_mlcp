@@ -69,10 +69,21 @@ BOILERPLATE = re.compile(
     r"cookie|subscribe|click here|read more|copyright|all rights reserved|©",
     re.IGNORECASE,
 )
+# Reporting patterns that make a trade-news item a "fact". Deliberately narrow: trade sites mostly
+# republish company press releases, which are claims. Generic words ("standard", "rule") and
+# company-PR wording ("opens", "announces plans") are not in this list.
 FACT_PATTERNS = [
-    "acquires", "acquired", "files", "filed", "opens", "to open", "completes", "completed",
-    "announces plans", "appoints", "fined", "recall", "regulation", "rule", "standard",
+    "acquires", "acquired", "files", "filed", "completes", "completed", "appoints", "fined",
+    "recall", "regulation",
 ]
+
+# Words that may appear in a page-title suffix ("... | Sullair") besides the source's own name.
+SITE_WORDS = {"news", "newsroom", "press", "blog", "home", "official", "site", "website"}
+
+# Sentence ends that are really abbreviations: "U.S.", "Inc.", "Co.", a single initial ("J.")...
+ABBREVIATION_END = re.compile(
+    r"(?:\b(?:[A-Za-z]\.){1,3}|\b(?:Inc|Co|Ltd|Corp|LLC|No|St|Mr|Mrs|Ms|Dr|vs|approx|Fig)\.)$"
+)
 
 
 # ---------- config ----------
@@ -94,6 +105,23 @@ def _load_technologies(path: str = "config/technologies.yaml") -> list[tuple[str
     with open(_resolve(path), encoding="utf-8") as fh:
         data = yaml.safe_load(fh) or []
     return [(str(entry["label"]), [str(p) for p in entry.get("patterns") or []]) for entry in data]
+
+
+@lru_cache
+def _load_aliases(path: str = "config/aliases.yaml") -> dict[str, list[str]]:
+    """canonical company name -> all names it is known by (canonical included)."""
+    with open(_resolve(path), encoding="utf-8") as fh:
+        data = yaml.safe_load(fh) or {}
+    return {str(canon): [str(canon), *(str(v) for v in (variants or []))] for canon, variants in data.items()}
+
+
+@lru_cache
+def _allow_list() -> list[str]:
+    """Strings Presidio must never replace: known company names and US place names. The small spaCy
+    model often tags these as PERSON, which would wipe the company or place out of titles and facts."""
+    names = {n for variants in _load_aliases().values() for n in variants}
+    names.update(_load_keywords()["us_locations"])
+    return sorted(names | {n.upper() for n in names} | {n.title() for n in names})
 
 
 # ---------- Presidio (built once per process) ----------
@@ -132,17 +160,57 @@ def scrub(text: Optional[str]) -> Optional[str]:
     from presidio_anonymizer.entities import OperatorConfig
 
     analyzer, anonymizer, _ = _engines()
-    results = analyzer.analyze(text=text, language="en", entities=PII_ENTITIES)
+    results = analyzer.analyze(text=text, language="en", entities=PII_ENTITIES, allow_list=_allow_list())
     if not results:
         return text
     operators = {e: OperatorConfig("replace", {"new_value": v}) for e, v in PII_REPLACEMENTS.items()}
     return anonymizer.anonymize(text=text, analyzer_results=results, operators=operators).text
 
 
+def person_name_tokens(*texts: Optional[str]) -> set[str]:
+    """Name parts of every multi-word PERSON found in the given texts. A full name is caught by
+    Presidio, but the same person is often mentioned again as a lone surname ("Foral will lead..."),
+    which it misses. Tokens that also occur in lower case somewhere ("energy", "greater") are common
+    words the small model mislabelled, so they are not treated as names."""
+    analyzer, _, _ = _engines()
+    joined = "\n".join(t for t in texts if t)
+    tokens: set[str] = set()
+    if not joined:
+        return tokens
+    for hit in analyzer.analyze(text=joined, language="en", entities=["PERSON"], allow_list=_allow_list()):
+        parts = re.findall(r"[A-Za-z][A-Za-z'’-]+", joined[hit.start:hit.end])
+        if len(parts) < 2:
+            continue
+        for part in parts:
+            if len(part) >= 3 and not re.search(rf"(?<!\w){re.escape(part.lower())}(?!\w)", joined):
+                tokens.add(part)
+    return tokens
+
+
+def redact_names(text: Optional[str], tokens: set[str]) -> Optional[str]:
+    """Replace each name token (whole word, exact case) with <PERSON>."""
+    if not text or not tokens:
+        return text
+    pattern = re.compile(r"(?<!\w)(?:" + "|".join(re.escape(t) for t in sorted(tokens, key=len, reverse=True)) + r")(?!\w)")
+    return pattern.sub("<PERSON>", text)
+
+
 # ---------- dates ----------
 
 _DEFAULT_A = datetime(2000, 1, 1)
 _DEFAULT_B = datetime(2001, 2, 2)
+
+
+def trusted_metadata_date(strict: Optional[str], extensive: Optional[str]) -> Optional[str]:
+    """Pick the page's own date. `strict` comes from trafilatura's normal metadata search, `extensive`
+    from its extensive search, which also reads datelines in the text but turns a bare year such as
+    '© 2026' into YYYY-01-01. A date that is exactly 1 January and only the extensive search found is
+    that footer artefact, so it is treated as no date."""
+    if strict:
+        return strict
+    if extensive and not extensive.endswith("-01-01"):
+        return extensive
+    return None
 
 
 def parse_published_date(value: Optional[str], today: Optional[date] = None) -> Optional[str]:
@@ -214,36 +282,89 @@ def _norm(name: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"[^\w\s]", " ", name.casefold())).strip()
 
 
+def _company_from_aliases(title: Optional[str], text: str) -> Optional[str]:
+    """The known company (config/aliases.yaml) mentioned most in title + text, as its canonical name.
+    None when nothing is known or two companies tie. Names of 3 characters or fewer are ignored
+    (an alias such as 'IR' would match unrelated text)."""
+    working = f"{title or ''}\n{text}"
+    in_title = f"{title or ''}"
+    counts: Counter = Counter()
+    title_hits: set[str] = set()
+    names = [(n, canon) for canon, variants in _load_aliases().items() for n in variants if len(n) > 3]
+    for name, canon in sorted(names, key=lambda pair: -len(pair[0])):  # longest first: no double counting
+        pattern = _term_regex(name)
+        hits = len(pattern.findall(working))
+        if hits:
+            counts[canon] += hits
+            working = pattern.sub(" ", working)
+            if pattern.search(in_title):
+                title_hits.add(canon)
+    if not counts:
+        return None
+    ranked = counts.most_common()
+    if len(ranked) > 1 and ranked[0][1] == ranked[1][1]:
+        tied = [c for c, n in ranked if n == ranked[0][1] and c in title_hits]
+        return tied[0] if len(tied) == 1 else None
+    return ranked[0][0]
+
+
 def _company_from_orgs(title: Optional[str], text: str, source_name: str) -> Optional[str]:
-    """Most frequent ORG name in the title, else in the first 1,500 characters of the text.
-    Returns None when there is no single clear winner."""
+    """Fallback when no known company matches: the ORG name spaCy finds at least twice in the title
+    plus the first 1,500 characters of text. The small model often mislabels phrases as ORG, so one
+    mention is never enough; None when there is no single clear winner."""
     _, _, nlp = _engines()
     own = _norm(company_from_source_name(source_name) or source_name)
     own_full = _norm(source_name)
+    # Pages repeat the headline as their <h1>; drop those lines so the title is not counted twice.
+    title_key = _norm(title) if title else ""
+    body = "\n".join(line for line in text.splitlines() if not title_key or _norm(line) != title_key)
+    snippet = f"{title or ''}. {body[:ORG_TEXT_WINDOW]}".strip()
+    names: list[str] = []
+    for ent in nlp(snippet).ents:
+        if ent.label_ != "ORG":
+            continue
+        value = re.sub(r"^the\s+", "", ent.text.strip(" .,:;\"'"), flags=re.IGNORECASE)
+        key = _norm(value)
+        if not key or "<" in value or key in GENERIC_ORG_WORDS:
+            continue
+        if own and (key == own or key in own_full or own in key):
+            continue
+        names.append(value)
+    if not names:
+        return None
+    counts = Counter(_norm(n) for n in names).most_common()
+    top_key, top_count = counts[0]
+    if top_count < 2 or (len(counts) > 1 and counts[1][1] == top_count):
+        return None
+    return next(n for n in names if _norm(n) == top_key)
 
-    def pick(snippet: str, min_count: int) -> Optional[str]:
-        if not snippet:
-            return None
-        names: list[str] = []
-        for ent in nlp(snippet).ents:
-            if ent.label_ != "ORG":
-                continue
-            value = ent.text.strip(" .,:;\"'")
-            key = _norm(value)
-            if not key or "<" in value or key in GENERIC_ORG_WORDS:
-                continue
-            if own and (key == own or key in own_full or own in key):
-                continue
-            names.append(value)
-        if not names:
-            return None
-        counts = Counter(_norm(n) for n in names).most_common()
-        top_key, top_count = counts[0]
-        if top_count < min_count or (len(counts) > 1 and counts[1][1] == top_count):
-            return None
-        return next(n for n in names if _norm(n) == top_key)
 
-    return pick(title or "", 1) or pick(text[:ORG_TEXT_WINDOW], 2)
+def strip_site_suffix(title: Optional[str], source_name: str) -> Optional[str]:
+    """'Sullair OFE1550 Wins Award | Sullair' -> 'Sullair OFE1550 Wins Award'. Only a trailing part made
+    entirely of the source's own name words is removed; anything else is left as published."""
+    if not title:
+        return title
+    parts = re.split(r"\s+[|–—-]\s+", title)
+    if len(parts) < 2:
+        return title
+    suffix = parts[-1]
+    tokens = _norm(suffix).split()
+    site_tokens = set(_norm(source_name).split()) | SITE_WORDS
+    if tokens and all(t in site_tokens for t in tokens):
+        stripped = title[: title.rfind(suffix)].rstrip(" |–—-")
+        return stripped or title
+    return title
+
+
+def split_sentences(paragraph: str) -> list[str]:
+    """Split after . ! ? but not after abbreviations such as 'U.S.', 'Inc.' or an initial."""
+    sentences: list[str] = []
+    for part in re.split(r"(?<=[.!?])\s+", paragraph.strip()):
+        if sentences and ABBREVIATION_END.search(sentences[-1]):
+            sentences[-1] = f"{sentences[-1]} {part}"
+        else:
+            sentences.append(part)
+    return sentences
 
 
 def _technology(haystack: str) -> Optional[str]:
@@ -265,11 +386,16 @@ def _shorten(sentence: str) -> str:
 
 def _key_facts(clean_text: str, compressor_terms: list[str], title: Optional[str] = None) -> list[str]:
     facts: list[str] = []
-    seen: set[str] = {_norm(title)} if title else set()  # the headline is already in `title`
+    title_key = _norm(title) if title else ""
+    seen: set[str] = {title_key} if title_key else set()  # the headline is already in `title`
     for paragraph in clean_text.splitlines():
-        for sentence in re.split(r"(?<=[.!?])\s+", paragraph.strip()):
+        for sentence in split_sentences(paragraph):
             sentence = sentence.strip()
             if len(sentence) < MIN_FACT_CHARS or BOILERPLATE.search(sentence):
+                continue
+            if sentence.isupper():  # navigation labels and shouted headings ("OUR DIGITAL PARTNERS")
+                continue
+            if title_key and _norm(sentence) in title_key:  # a piece of the headline, not a new fact
                 continue
             qualifies = (
                 any(_found(t, sentence) for t in compressor_terms)
@@ -313,13 +439,17 @@ def extract_item(page: FetchedPage, source: Source) -> Item:
 
     raw_title = (getattr(meta, "title", None) if meta else None) or page.listing_title
     raw_title = raw_title.strip() if raw_title and raw_title.strip() else None
-    published_at = (
-        parse_published_date(getattr(meta, "date", None) if meta else None)
-        or parse_published_date(page.listing_published)
+    raw_title = strip_site_suffix(raw_title, source.name)
+    strict_meta = trafilatura.extract_metadata(trafilatura.load_html(page.html), extensive=False)
+    meta_date = trusted_metadata_date(
+        getattr(strict_meta, "date", None) if strict_meta else None,
+        getattr(meta, "date", None) if meta else None,
     )
+    published_at = parse_published_date(meta_date) or parse_published_date(page.listing_published)
 
     keywords = _load_keywords()
-    title = scrub(raw_title)  # Presidio runs on the title in every case
+    names = person_name_tokens(raw_title, text)  # surnames that Presidio misses when they stand alone
+    title = redact_names(scrub(raw_title), names)  # Presidio runs on the title in every case
 
     if len(text.strip()) < MIN_TEXT_CHARS:
         # Empty or very short page: keep what exists, never invent the rest.
@@ -336,7 +466,7 @@ def extract_item(page: FetchedPage, source: Source) -> Item:
         text = ""
         return item
 
-    clean_text = scrub(text) or ""
+    clean_text = redact_names(scrub(text), names) or ""
     haystack = f"{clean_text} {title or ''}"
 
     matched = [t for t in keywords["compressor"] if _found(t, haystack)]
@@ -346,7 +476,7 @@ def extract_item(page: FetchedPage, source: Source) -> Item:
     if source.type == "competitor":
         company = company_from_source_name(source.name)
     else:
-        company = _company_from_orgs(title, clean_text, source.name)
+        company = _company_from_aliases(title, clean_text) or _company_from_orgs(title, clean_text, source.name)
 
     facts = [f for f in (scrub(f) for f in _key_facts(clean_text, keywords["compressor"], title)) if f]
     facts = [_shorten(f) for f in facts][:MAX_KEY_FACTS]

@@ -8,8 +8,8 @@ from datetime import date
 import pytest
 
 from atlas.extract import (
-    SPACY_MODEL, _engines, company_from_source_name, empty_page_fingerprint, extract_item,
-    parse_published_date,
+    SPACY_MODEL, _company_from_orgs, _engines, company_from_source_name, empty_page_fingerprint,
+    extract_item, parse_published_date, scrub, split_sentences, strip_site_suffix, trusted_metadata_date,
 )
 from atlas.models import FetchedPage, Item, Source, make_item_id
 
@@ -204,3 +204,132 @@ def test_presidio_uses_small_model():
 def test_unparseable_page_raises(bad):
     with pytest.raises(ValueError, match="unparseable page"):
         extract_item(make_page(bad), make_source())
+
+# ---------- regression tests from the live-page review (2026-10-29) ----------
+
+# 11. dates: a bare year in a footer must never become YYYY-01-01
+def test_trusted_metadata_date_rules():
+    assert trusted_metadata_date(None, "2026-01-01") is None          # footer artefact
+    assert trusted_metadata_date(None, "2026-06-24") == "2026-06-24"  # a real dateline from the text
+    assert trusted_metadata_date("2026-03-02", "2026-01-01") == "2026-03-02"  # strict result wins
+    assert trusted_metadata_date(None, None) is None
+
+
+def test_footer_year_is_not_a_published_date():
+    body = BODY + "<footer><span>© 2026 ACME COMPRESSORS</span></footer>"
+    item = extract_item(make_page(make_html(published=None, body=body)), make_source())
+    assert item.published_at is None
+
+
+def test_dateline_in_text_is_still_used():
+    body = "<p>Mobile, AL, June 24, 2026 - Acme Compressors expanded its oil-free compressor assembly in Alabama.</p>" + BODY
+    item = extract_item(make_page(make_html(published=None, body=body)), make_source())
+    assert item.published_at == "2026-06-24"
+
+
+# 12. title suffix
+def test_site_suffix_is_stripped_only_when_it_is_the_site_name():
+    assert strip_site_suffix("Sullair OFE1550 Wins Award | Sullair", "Sullair (Hitachi) US news") == "Sullair OFE1550 Wins Award"
+    assert strip_site_suffix("Nitrogen Explained | KAESER TALKS SHOP BLOG",
+                             "Kaeser Compressors USA (Kaeser Talks Shop blog)") == "Nitrogen Explained"
+    assert strip_site_suffix("Atlas wins - Atlas Copco", "Atlas Copco USA (local news)") == "Atlas wins"
+    assert strip_site_suffix("Acme wins award - Beta Corp", "Acme Newsroom") == "Acme wins award - Beta Corp"
+    assert strip_site_suffix("Plain headline", "Acme Newsroom") == "Plain headline"
+    assert strip_site_suffix(None, "Acme") is None
+
+
+def test_title_suffix_stripped_in_item():
+    html = make_html(title="Acme launches oil-free rotary screw compressor in Texas | Acme Compressors USA Newsroom")
+    assert extract_item(make_page(html), make_source()).title == "Acme launches oil-free rotary screw compressor in Texas"
+
+
+# 13. sentence splitting
+def test_sentences_do_not_split_after_abbreviations():
+    assert split_sentences("Atlas Copco expands U.S. operations in Ohio. It opened a plant.") == [
+        "Atlas Copco expands U.S. operations in Ohio.", "It opened a plant."]
+    assert split_sentences("Acme Inc. announced a deal. More news follows.") == [
+        "Acme Inc. announced a deal.", "More news follows."]
+    assert split_sentences("One thing. Two things! Three things?") == ["One thing.", "Two things!", "Three things?"]
+
+
+def test_key_facts_do_not_repeat_the_headline_or_cut_at_us():
+    title = "Acme Group Expands U.S. Operations and Opens Facility in South Carolina"
+    body = f"<p>{title}</p><p>Acme Group announced a new oil-free air compressor assembly center in Rock Hill, SC.</p>" + BODY
+    item = extract_item(make_page(make_html(title=title, body=body)), make_source())
+    assert not any(f.rstrip(".") == "Acme Group Expands U.S" for f in item.key_facts)
+    assert not any(f in title for f in item.key_facts)
+    assert any("Rock Hill" in f for f in item.key_facts)
+
+
+# 14. company: known names first, never a one-off spaCy guess
+def test_company_from_alias_table_for_trade_news():
+    html = make_html(title="ZEKS Launches Next-Generation Dryers for Greater Energy Savings",
+                     body="<p>ZEKS Compressed Air Solutions introduced new refrigerated air dryers for compressed air systems in factories.</p>" + BODY)
+    item = extract_item(make_page(html), make_source(type="trade_news", name="Trade Weekly"))
+    assert item.company == "ZEKS Compressed Air Solutions"
+
+
+def test_one_off_org_guess_is_not_used():
+    text = "Acme Industries brought partners together for a distributor meeting this week."
+    assert _company_from_orgs("Unleash Prosperity and Security For Everyone", text, "Trade Weekly") is None
+    html = make_html(title="Greater Energy Savings Arrive", body="<p>New refrigerated compressed air dryers cut energy use in plants.</p>" + BODY)
+    item = extract_item(make_page(html), make_source(type="trade_news", name="Trade Weekly"))
+    assert item.company is None
+
+
+# 15. personal-data scrub keeps known companies and places
+def test_scrub_keeps_known_companies_and_places_but_removes_people():
+    assert scrub("Hertz Kompressoren brought together distributors in Rock Hill, South Carolina.") == \
+        "Hertz Kompressoren brought together distributors in Rock Hill, South Carolina."
+    out = scrub("John Smith joined Hertz Kompressoren in Rock Hill.")
+    assert "John Smith" not in out and "<PERSON>" in out
+    assert "Hertz Kompressoren" in out and "Rock Hill" in out
+
+
+# 16. labels: only narrow reporting patterns make trade news a "fact"
+def test_generic_words_do_not_make_trade_news_a_fact():
+    body = "<p>The new compressor meets the industry standard and follows the usual rule for safe installation in plants.</p>" + BODY
+    html = make_html(title="Acme unveils a new rotary screw compressor", body=body)
+    assert extract_item(make_page(html), make_source(type="trade_news", name="Trade Weekly")).label == "claim"
+
+
+# 17. technology labels for screw compressors
+def test_screw_air_compressor_labels():
+    body = (
+        "<p>Acme expanded assembly of its 90-250 HP oil-injected screw air compressors in Alabama this year.</p>"
+        "<p>The company said the plant in Mobile will add shifts to meet demand from factories across the region.</p>"
+        "<p>Local suppliers will provide housings and piping for the new production line over the coming months.</p>"
+    )
+    html = make_html(title="Acme expands assembly of screw air compressors", body=body)
+    assert extract_item(make_page(html), make_source()).technology == "oil-injected rotary screw compressor"
+
+
+# 18. a surname that stands alone after the full name must not leak
+def test_lone_surname_is_redacted_after_full_name():
+    body = (
+        "<p>Acme Compressors welcomed Sarah Mitchell as director of marketing for its compressor business in Texas.</p>"
+        "<p>Mitchell will lead product launches for the oil-free rotary screw compressor range across the region.</p>"
+        "<p>The company said Mitchell brings fifteen years of experience in industrial sales to the new role.</p>"
+    )
+    html = make_html(title="Acme welcomes Sarah Mitchell as marketing director", body=body)
+    item = extract_item(make_page(html), make_source())
+    dump = item.model_dump_json()
+    assert "Mitchell" not in dump and "Sarah" not in dump
+    assert item.title is not None and "<PERSON>" in item.title
+    assert "Acme" in item.title
+
+
+def test_common_words_mislabelled_as_names_are_not_redacted_everywhere():
+    # "energy" appears in lower case, so it is never turned into a name token
+    from atlas.extract import person_name_tokens, redact_names
+    tokens = person_name_tokens("John Smith saves energy with the new compressor. Smith likes energy.")
+    assert "Smith" in tokens and "John" in tokens
+    assert redact_names("Smith saves energy", tokens) == "<PERSON> saves energy"
+    assert redact_names("nothing to hide", set()) == "nothing to hide"
+
+
+# 19. shouted navigation labels are not facts
+def test_all_caps_labels_are_not_key_facts():
+    body = BODY + "<p>OUR DIGITAL PARTNERS</p><p>THE NEW OIL-FREE COMPRESSOR IS HERE TODAY FOR ALL FACTORIES</p>"
+    item = extract_item(make_page(make_html(body=body)), make_source())
+    assert not any(f.isupper() for f in item.key_facts)

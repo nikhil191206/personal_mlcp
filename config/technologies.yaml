@@ -7,8 +7,10 @@
   patterns: [oil-free compressor, oil free compressor, oil-free air]
 - label: variable speed drive compressor
   patterns: [variable speed drive, variable speed compressor, vsd compressor]
+- label: oil-injected rotary screw compressor
+  patterns: [oil-injected screw, oil-flooded screw, oil-injected rotary screw, oil injected screw]
 - label: rotary screw compressor
-  patterns: [rotary screw, screw compressor]
+  patterns: [rotary screw, screw compressor, screw air compressor]
 - label: centrifugal compressor
   patterns: [centrifugal compressor, centrifugal air compressor]
 - label: reciprocating compressor
