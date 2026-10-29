@@ -463,7 +463,7 @@ DATABRICKS_TOKEN=<your own token>
 DATABRICKS_CATALOG=atlas_poc
 DATABRICKS_SCHEMA=default
 DATABRICKS_VOLUME=data
-CONTACT_EMAIL=<team contact email, see section 18>
+CONTACT_EMAIL=industrymlcp@gmail.com
 ATLAS_PATH_PREFIX=dev/<yourname>
 ```
 
@@ -599,13 +599,13 @@ Nobody should wait idle: every module has a clear interface and can be built and
 | Text snippets per item | None |
 | Recency window | 12 months |
 | Gate vs `proposed` | Gate admits `proposed`/`approved`, refuses the rest |
+| Contact email in the User-Agent | `industrymlcp@gmail.com` (`CONTACT_EMAIL`, already in `.env.example`) |
 | Two status lists | `vetting_status` (technical result) separate from `status` (approval) |
 
 ### Open (need an answer)
 
 | Item | Who answers | Needed by |
 |---|---|---|
-| **Team contact email for the User-Agent** (`CONTACT_EMAIL`) | team | before the first real fetch (Ragini's live test) |
 | Demo time on Friday | team | now |
 | Which 5 sources to keep (after vetting) | team, with Ragini's table | Thu night |
 | Add Ragini, Sachi, Parth as GitHub collaborators on the repo | Nikhil | now |

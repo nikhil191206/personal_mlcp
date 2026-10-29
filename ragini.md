@@ -26,7 +26,7 @@ For the **vetting work** (Task R1) the AI cannot browse for you unless it has a 
 
 ## Task R0 — Setup (first)
 
-Follow `parent.md` section 12. `python -m atlas.storage_check` must print PASS with `ATLAS_PATH_PREFIX=dev/ragini`. Ask the team for `CONTACT_EMAIL` and put it in your `.env`. You need it for live fetches.
+Follow `parent.md` section 12. `python -m atlas.storage_check` must print PASS with `ATLAS_PATH_PREFIX=dev/ragini`. `CONTACT_EMAIL=industrymlcp@gmail.com` goes in your `.env` (it is already in `.env.example`). You need it for live fetches.
 
 ## Task R1 — Vet the sources (Thu, first)
 

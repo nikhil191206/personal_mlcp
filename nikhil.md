@@ -28,7 +28,7 @@ Give your AI, in this order: (1) all of `parent.md`, (2) all of this file, (3) `
 1. Add Ragini, Sachi and Parth as collaborators on the GitHub repo (Settings → Collaborators).
 2. Check each teammate is in the Databricks workspace (Settings → Identity and access → Users) and can see the `atlas_poc` catalog and the `data` volume (they need read/write on it: Catalog → atlas_poc → default → data → Permissions). Fix permissions if they cannot.
 3. `python-dateutil` and `lxml` are already in `requirements.txt` (used by filter, extract and collect).
-4. Post the open items from `parent.md` section 18 in the team chat: **contact email**, **demo time**.
+4. Post the open items from `parent.md` section 18 in the team chat: **demo time**, collaborators added. (Contact email is decided: `industrymlcp@gmail.com`.)
 5. Remind everyone: own token, own `ATLAS_PATH_PREFIX=dev/<name>`, never share a token in chat.
 
 ## Task N1 — `atlas/filter.py`
