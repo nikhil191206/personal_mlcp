@@ -11,4 +11,6 @@ python-dotenv
 pydantic
 pydantic-settings
 pyyaml
+python-dateutil
+lxml
 pytest

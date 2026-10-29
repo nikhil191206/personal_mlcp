@@ -1,0 +1,56 @@
+# Relevance-filter vocabulary. Matching: case-insensitive, whole word / whole phrase.
+# Edit by adding entries; do not rename the three top-level keys.
+
+compressor:
+  - compressor
+  - compressors
+  - compressed air
+  - rotary screw
+  - screw compressor
+  - centrifugal compressor
+  - reciprocating compressor
+  - piston compressor
+  - scroll compressor
+  - oil-free
+  - oil free
+  - air end
+  - airend
+  - air receiver
+  - air dryer
+  - cfm
+  - variable speed drive
+  - vsd
+
+industrial:
+  - industrial
+  - manufacturing
+  - factory
+  - plant
+  - process
+  - heavy-duty
+
+us_locations:
+  - United States
+  - U.S.
+  - USA
+  - America
+  - American
+  - Alabama
+  - Arizona
+  - California
+  - Colorado
+  - Florida
+  - Georgia
+  - Illinois
+  - Indiana
+  - Michigan
+  - New York
+  - North Carolina
+  - Ohio
+  - Pennsylvania
+  - Texas
+  - Wisconsin
+  - Davidson
+  - Charlotte
+  - Houston
+  - Chicago

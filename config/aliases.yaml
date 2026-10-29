@@ -1,0 +1,37 @@
+# Company name aliases: canonical name -> list of variants that mean the same company.
+# Matching is case-insensitive and ignores punctuation and legal suffixes (Inc, LLC, Co., Corp, AB, GmbH...).
+# Add entries; do not delete existing ones.
+
+Ingersoll Rand:
+  - Ingersoll Rand Inc.
+  - Ingersoll-Rand
+  - Ingersoll Rand Company
+  - IR
+
+Kaeser Compressors:
+  - Kaeser Kompressoren
+  - Kaeser Compressors Inc.
+  - Kaeser Compressors USA
+  - Kaeser
+
+Sullair:
+  - Sullair LLC
+  - Sullair, LLC
+
+Atlas Copco:
+  - Atlas Copco AB
+  - Atlas Copco Group
+  - Atlas Copco USA
+  - Atlas Copco Compressors LLC
+
+Quincy Compressor:
+  - Quincy Compressor LLC
+  - Quincy Compressors
+
+Gardner Denver:
+  - Gardner Denver Inc.
+  - Gardner Denver Holdings
+
+Hitachi:
+  - Hitachi Ltd.
+  - Hitachi Industrial Equipment Systems

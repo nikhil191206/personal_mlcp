@@ -1,0 +1,21 @@
+# Technology labels used to fill Item.technology. First matching entry wins, so keep specific ones above general ones.
+# Matching: case-insensitive, whole phrase, against title + main text. If nothing matches, technology stays null.
+
+- label: oil-free rotary screw compressor
+  patterns: [oil-free rotary screw, oil free rotary screw]
+- label: oil-free compressor
+  patterns: [oil-free compressor, oil free compressor, oil-free air]
+- label: variable speed drive compressor
+  patterns: [variable speed drive, variable speed compressor, vsd compressor]
+- label: rotary screw compressor
+  patterns: [rotary screw, screw compressor]
+- label: centrifugal compressor
+  patterns: [centrifugal compressor, centrifugal air compressor]
+- label: reciprocating compressor
+  patterns: [reciprocating compressor, piston compressor]
+- label: scroll compressor
+  patterns: [scroll compressor]
+- label: compressed air treatment
+  patterns: [air dryer, compressed air dryer, air filter, compressed air treatment]
+- label: compressed air system
+  patterns: [compressed air system, compressed air]
