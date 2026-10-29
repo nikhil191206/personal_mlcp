@@ -1,0 +1,194 @@
+# Source register. Vetted 2026-10-29 (see docs/source_vetting.md for the evidence behind every row).
+# Nothing is "approved": only Atlas Copco can approve. The Compliance Gate runs `proposed` sources whose
+# vetting_status is `working`, and refuses everything else.
+
+# ---------- proposed: working ----------
+
+- source_id: airbestpractices_news
+  name: Compressed Air Best Practices (industry news)
+  url: https://www.airbestpractices.com/industry-news
+  type: trade_news
+  access_method: rss
+  feed_url: https://www.airbestpractices.com/rss.xml
+  item_url_pattern: null
+  robots_status: allowed
+  terms_status: ok
+  vetting_status: working
+  status: proposed
+  review_date: 2026-10-29
+  region: US
+  licence_note: "Public web page; facts and links only"
+  crawl_delay: null
+  notes: "RSS feed with 25 current entries. Terms and Conditions page read: no clause on automated access."
+
+- source_id: atlas_copco_usa_news
+  name: Atlas Copco USA (local news and updates)
+  url: https://www.atlascopco.com/en-us/news/latest-news
+  type: competitor
+  access_method: html
+  feed_url: null
+  item_url_pattern: '^https://www\.atlascopco\.com/en-us/news/latest-news/[a-z0-9-]+/?$'
+  robots_status: allowed
+  terms_status: ok
+  vetting_status: working
+  status: proposed
+  review_date: 2026-10-29
+  region: US
+  licence_note: "Public web page; facts and links only"
+  crawl_delay: 1
+  notes: "The client's own newsroom, included to show how Atlas Copco describes its own news. No RSS. robots.txt Crawl-delay is 1 s; we use at least 3 s. Legal & Privacy Notices page has no clause on automated access."
+
+- source_id: sullair_america_news
+  name: Sullair (Hitachi Global Air Power) US news
+  url: https://america.sullair.com/en/news
+  type: competitor
+  access_method: html
+  feed_url: null
+  item_url_pattern: '^https://america\.sullair\.com/en/news/[a-z0-9-]+/?$'
+  robots_status: allowed
+  terms_status: ok
+  vetting_status: working
+  status: proposed
+  review_date: 2026-10-29
+  region: US
+  licence_note: "Public web page; facts and links only"
+  crawl_delay: null
+  notes: "No RSS. The global site (www.sullair.com) has no news section; the US site (america.sullair.com) does. Terms of Use page read: no clause on automated access."
+
+- source_id: kaeser_usa_blog
+  name: Kaeser Compressors USA (Kaeser Talks Shop blog)
+  url: https://us.kaeser.com/compressed-air-resources/kaeser-talks-shop/
+  type: competitor
+  access_method: html
+  feed_url: null
+  item_url_pattern: '^https://us\.kaeser\.com/compressed-air-resources/kaeser-talks-shop/(?!(?:\d{4}|air-compressors|air-treatment|blowers|controls|education|installation-nightmares|piping-and-storage|portable-compressors|system-efficiency|authors|default)\.aspx)[a-z0-9-]+\.aspx$'
+  robots_status: allowed
+  terms_status: unknown
+  vetting_status: working
+  status: proposed
+  review_date: 2026-10-29
+  region: US
+  licence_note: "Public web page; facts and links only"
+  crawl_delay: null
+  notes: "The press-release page lists no individual release links, so the blog is used. No RSS. No terms-of-use page found (only a Legal notice, which has no automation clause): Atlas Copco Legal should confirm."
+
+- source_id: doe_newsroom
+  name: US Department of Energy newsroom
+  url: https://www.energy.gov/newsroom
+  type: government
+  access_method: html
+  feed_url: null
+  item_url_pattern: '^https://www\.energy\.gov/articles/[a-z0-9-]+/?$'
+  robots_status: allowed
+  terms_status: ok
+  vetting_status: working
+  status: proposed
+  review_date: 2026-10-29
+  region: US
+  licence_note: "US government web page; facts and links only"
+  crawl_delay: null
+  notes: "General energy news, so few items will be compressor-related; this shows the relevance filter at work. Web Policies page read: no clause on automated access."
+
+# ---------- found blocked or unreachable (kept as findings; never worked around) ----------
+
+- source_id: cagi_news
+  name: CAGI (Compressed Air and Gas Institute)
+  url: https://www.cagi.org/
+  type: trade_news
+  access_method: html
+  feed_url: null
+  item_url_pattern: null
+  robots_status: allowed
+  terms_status: forbids_automation
+  vetting_status: blocked
+  status: blocked
+  review_date: 2026-10-29
+  region: US
+  licence_note: "Terms of use forbid automated access"
+  crawl_delay: null
+  notes: "Terms of Use (https://www.cagi.org/cagi-terms-of-use) forbid robots and data mining. Needs written permission from CAGI."
+
+- source_id: prnewswire_releases
+  name: PR Newswire (company press releases)
+  url: https://www.prnewswire.com/news-releases/
+  type: trade_news
+  access_method: html
+  feed_url: null
+  item_url_pattern: null
+  robots_status: allowed
+  terms_status: forbids_automation
+  vetting_status: blocked
+  status: blocked
+  review_date: 2026-10-29
+  region: US
+  licence_note: "Terms of use forbid automated access"
+  crawl_delay: null
+  notes: "Terms of Use (https://www.prnewswire.com/terms-of-use/) forbid scraping and robots/spiders. Their paid or licensed feeds would be the route."
+
+- source_id: plant_services_news
+  name: Plant Services (Endeavor Business Media)
+  url: https://www.plantservices.com/industry-news
+  type: trade_news
+  access_method: rss
+  feed_url: 'https://www.plantservices.com/__rss/website-scheduled-content.xml?input=%7B%22sectionAlias%22%3A%22home%22%7D'
+  item_url_pattern: null
+  robots_status: allowed
+  terms_status: forbids_automation
+  vetting_status: blocked
+  status: blocked
+  review_date: 2026-10-29
+  region: US
+  licence_note: "Terms of use forbid automated access"
+  crawl_delay: null
+  notes: "Endeavor Business Media terms (https://www.endeavorbusinessmedia.com/endeavor-terms) forbid robots, spiders and scraping. A feed exists but the terms still apply."
+
+- source_id: plant_engineering_news
+  name: Plant Engineering
+  url: https://www.plantengineering.com/
+  type: trade_news
+  access_method: html
+  feed_url: null
+  item_url_pattern: null
+  robots_status: allowed
+  terms_status: unknown
+  vetting_status: unreachable
+  status: needs_permission
+  review_date: 2026-10-29
+  region: US
+  licence_note: "Site answers HTTP 403 to our agent"
+  crawl_delay: 10
+  notes: "robots.txt is readable (Crawl-delay 10) but the homepage returned HTTP 403 to our identified agent. Not retried or bypassed. Terms were not read. Ask the publisher for permission or a feed."
+
+- source_id: ingersoll_rand_news
+  name: Ingersoll Rand (irco.com)
+  url: https://www.irco.com/
+  type: competitor
+  access_method: html
+  feed_url: null
+  item_url_pattern: null
+  robots_status: unknown
+  terms_status: unknown
+  vetting_status: unreachable
+  status: needs_permission
+  review_date: 2026-10-29
+  region: US
+  licence_note: "Site answers HTTP 429 to our agent"
+  crawl_delay: null
+  notes: "robots.txt and the homepage both returned HTTP 429 (too many requests) on our first request each. Not retried or bypassed. Ask Ingersoll Rand or use a licensed feed."
+
+- source_id: businesswire_releases
+  name: Business Wire (company press releases)
+  url: https://www.businesswire.com/
+  type: trade_news
+  access_method: html
+  feed_url: null
+  item_url_pattern: null
+  robots_status: disallowed
+  terms_status: unknown
+  vetting_status: unreachable
+  status: needs_permission
+  review_date: 2026-10-29
+  region: US
+  licence_note: "Site answers HTTP 403 to our agent"
+  crawl_delay: null
+  notes: "robots.txt and the homepage returned HTTP 403 (treated as disallow-all). Not bypassed. Terms were not read."
