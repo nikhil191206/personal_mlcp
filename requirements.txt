@@ -1,0 +1,14 @@
+httpx
+feedparser
+trafilatura
+presidio-analyzer
+presidio-anonymizer
+spacy
+pandas
+rapidfuzz
+databricks-sdk
+python-dotenv
+pydantic
+pydantic-settings
+pyyaml
+pytest
