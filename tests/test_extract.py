@@ -117,6 +117,13 @@ def test_personal_data_removed_from_title_and_facts():
     assert item.personal_data_removed is True
 
 
+def test_known_company_names_are_not_scrubbed_as_people():
+    from atlas.extract import scrub
+    out = scrub("Atlas Copco Group Expands U.S. Operations and Opens Facility in South Carolina")
+    assert "<PERSON>" not in out
+    assert out.startswith("Atlas Copco Group")
+
+
 # 4. no page text stored
 def test_no_page_text_in_item():
     item = extract_item(make_page(make_html()), make_source())
