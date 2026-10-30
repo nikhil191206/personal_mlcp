@@ -115,11 +115,29 @@ def _load_aliases(path: str = "config/aliases.yaml") -> dict[str, list[str]]:
     return {str(canon): [str(canon), *(str(v) for v in (variants or []))] for canon, variants in data.items()}
 
 
+_LEGAL_WORDS = {"inc", "incorporated", "llc", "ltd", "limited", "co", "company", "corp", "corporation",
+                "ab", "gmbh", "plc", "sa", "ag", "holdings", "group"}
+
+
 @lru_cache
 def _allow_list() -> list[str]:
     """Strings Presidio must never replace: known company names and US place names. The small spaCy
-    model often tags these as PERSON, which would wipe the company or place out of titles and facts."""
-    names = {n for variants in _load_aliases().values() for n in variants}
+    model often tags these as PERSON, which would wipe the company or place out of titles and facts.
+    Includes canonical names, every variant, each variant without trailing legal words
+    ("Atlas Copco Compressors LLC" -> "Atlas Copco Compressors"), and single words of 4+ letters."""
+    names: set[str] = set()
+    for canonical, variants in _load_aliases().items():
+        for name in [canonical, *variants]:
+            name = str(name).strip()
+            if not name:
+                continue
+            names.add(name)
+            names.update(re.findall(r"[A-Za-z][A-Za-z-]{3,}", name))
+            words = name.replace(",", " ").split()
+            while words and words[-1].strip(".").lower() in _LEGAL_WORDS:
+                words.pop()
+                if words:
+                    names.add(" ".join(words))
     names.update(_load_keywords()["us_locations"])
     return sorted(names | {n.upper() for n in names} | {n.title() for n in names})
 
