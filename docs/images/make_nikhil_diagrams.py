@@ -145,3 +145,24 @@ if __name__ == "__main__":
     for fn in (run_order, filter_diagram, switching, loop, results):
         fn()
     print("wrote 5 images in", OUT)
+
+
+def storage_diagram():
+    w, h = 9, 6.2
+    fig, ax = new(w, h)
+    heading(ax, h, "Where the information lives")
+    ax.add_patch(FancyBboxPatch((0.2, 0.65), 8.6, 4.75, boxstyle="round,pad=0.02,rounding_size=0.12", fc="white", ec=INK, lw=2.4, ls="--"))
+    ax.text(0.5, 5.05, "Databricks Volume   /Volumes/atlas_poc/default/data/<prefix>/", fontsize=11, fontweight="bold", va="center")
+    folders = [("source_register", "sources used"), ("raw", "what was collected"), ("clean", "every item + reasons"),
+               ("facts", "items that passed"), ("output", "final results file"), ("logs", "what happened"),
+               ("settings", "saved choices"), ("scout", "found sites + decisions"), ("reports", "PPTX and PDF")]
+    for i, (name, sub) in enumerate(folders):
+        r, c = divmod(i, 3)
+        box(ax, 0.5 + c * 2.8, 3.5 - r * 1.3, 2.55, 1.1, name + "/", sub, mine=(name in ("clean", "output", "settings")),
+            tsize=12, ssize=9.5)
+    ax.text(0.2, 0.25, "Grey = folders my part writes or reads most. Written from memory, never to a laptop.", fontsize=9, color=MID)
+    fig.savefig(OUT / "nikhil_storage.png", dpi=170, bbox_inches="tight", facecolor="white")
+
+
+if __name__ == "__main__":
+    storage_diagram()
