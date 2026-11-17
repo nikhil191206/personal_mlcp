@@ -1,4 +1,4 @@
-"""Builds docs/slides/nikhil_pages_16_21.pptx: Nikhil's pages for the group deck (pages 16 to 21).
+"""Builds docs/slides/nikhil_pages_16_19.pptx: Nikhil's pages for the group deck (pages 16 to 21).
 Run: python docs/slides/make_deck.py   (needs python-pptx). Images come from docs/images/. Opens in PowerPoint and in
 Canva (Upload, then Import). Content only about what was built: records, storage, filter, switching, stories."""
 from pathlib import Path
@@ -60,21 +60,6 @@ def table(s, left, top, width, cols, header, rows, size=12, row_h=0.5, header_h=
     return t
 
 
-# ---- 16 ----
-s = slide("My part: the core of the system")
-table(s, 0.7, 1.4, 11.9, [3.3, 8.6], ["Module", "What it does"], [
-    ["models.py", "Defines every record in one place, so all the code fits together"],
-    ["settings.py, storage.py", "Reads the private settings; reads and writes the Databricks Volume"],
-    ["filter.py", "Decides keep or drop, and records the reasons"],
-    ["scout/settings_store.py", "Saves and loads the team's filters and decisions"],
-    ["scout/fallback.py", "Switching: follows a company elsewhere when its own source refuses"],
-    ["scout/stories.py", "Groups items about the same event into one story"],
-    ["review.py", "Saves which facts are important and which sources are confirmed"],
-    ["run.py", "Runs every step in order and writes the results and the log"],
-    ["report/brief.py + the 4-page app", "The brief (facts, sources, why it matters) and the Dashboard, Sources, Facts, Report pages"],
-], size=13, row_h=0.52)
-note(s, "Rules inside, no AI model. Every decision can be explained.", top=6.7, bold=True)
-
 # ---- 17 ----
 s = slide("What one evidence record holds")
 table(s, 0.7, 1.4, 11.9, [3.0, 8.9], ["Group", "Fields"], [
@@ -111,22 +96,9 @@ table(s, 0.7, 1.4, 11.9, [2.4, 7.0, 2.5], ["Check", "The rule", "Reason if it fa
     ["Credible source", "The source is vetted as working and is proposed or approved, not blocked", "source_not_credible"],
     ["Recent", "Published within the last N months (default 12). No date, or a date in the future, fails", "date_missing, date_in_future, too_old"],
 ], size=13, row_h=0.85, header_h=0.5)
-note(s, "An item passes only if all four checks pass. Words match whole words, in any letter case.", top=5.85, size=14)
-note(s, "\"Industrial\" (6 words: industrial, manufacturing, factory, plant, process, heavy-duty) is a flag only, not a gate.", top=6.4, size=14)
-
-# ---- 20 ----
-s = slide("Your settings add six more rules")
-s.shapes.add_picture(str(IMG / "nikhil_filter.png"), Inches(0.5), Inches(1.5), width=Inches(7.5))
-table(s, 8.2, 1.5, 4.8, [2.3, 2.5], ["Setting", "Reason if it fails"], [
-    ["Regions (US, CA, MX)", "region_not_selected"],
-    ["Technologies", "technology_not_selected"],
-    ["Types of news", "event_type_not_selected"],
-    ["Words to leave out", "excluded_keyword"],
-    ["Industrial only", "not_industrial"],
-    ["Source types", "source_type_not_selected"],
-], size=11, row_h=0.55)
-note(s, "Every failed check is listed, not only the first. With no settings the filter behaves exactly as before. Default regions: US and Canada.", top=5.7, size=13)
-note(s, "A dropped item stays in clean/ with all its reasons; only kept items go into the results.", top=6.3, size=13)
+note(s, "An item passes only if all four checks pass. Words match whole words, in any letter case.", top=5.55, size=14)
+note(s, "\"Industrial\" (6 words: industrial, manufacturing, factory, plant, process, heavy-duty) is a flag only, not a gate.", top=6.05, size=14)
+note(s, "Your settings add six more rules: region, technology, news type, excluded words, industrial only, source types.", top=6.55, size=14)
 
 # ---- 21 ----
 s = slide("Switching and stories: the rules inside")
@@ -142,6 +114,6 @@ table(s, 0.7, 4.1, 11.9, [2.6, 9.3], ["Stories", "Rule"], [
     ["Story id", "A fixed code from the earliest item and the company, so it stays the same between runs"],
 ], size=12, row_h=0.5)
 
-out = HERE / "nikhil_pages_16_21.pptx"
+out = HERE / "nikhil_pages_16_19.pptx"
 prs.save(out)
 print("wrote", out)
