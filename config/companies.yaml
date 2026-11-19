@@ -1,0 +1,11 @@
+# Company websites for the company profiles (phase 3, tasks 8 and 10).
+#
+# Every competitor in config/sources.yaml is already known (its newsroom's site root is used), so only add
+# companies that have no row there. Use the company's own official website, checked by hand. The website is
+# read through the Compliance Gate like any source: robots.txt and the 3 s delay apply, and a website that
+# config/sources.yaml marks as refused is never read.
+#
+# Format:
+#   - name: Kaeser Compressors        # the canonical name used in config/aliases.yaml
+#     website: https://...            # the company's own homepage
+[]

@@ -25,6 +25,8 @@ import trafilatura
 import yaml
 from dateutil import parser as date_parser
 
+from atlas import htmlmeta
+from atlas.company import CompanyGuess, discover_company
 from atlas.models import (
     EventType, FetchedPage, Item, Label, Region, Source, make_fingerprint, make_item_id,
 )
@@ -814,6 +816,79 @@ def detect_product(title: str | None, text: str, company: str | None) -> str | N
     return _known_product(title, text, company) or _model_code(title, text, company)
 
 
+# ---------- Phase 3: headings, summary, image, text fallback (task 3) ----------
+
+MAX_HEADINGS = 5
+MAX_HEADING_CHARS = 120
+MAX_SUMMARY_CHARS = 300
+
+
+def _main_text(html: str) -> str:
+    """Main text by trafilatura. Precision first (fewest menus and footers); when that leaves less than
+    MIN_TEXT_CHARS, a second pass that favours recall and keeps tables, so short or table-heavy articles
+    (spec sheets, award lists) are not lost. Each pass gets its own tree: trafilatura edits the tree it reads."""
+    text = trafilatura.extract(
+        trafilatura.load_html(html), include_comments=False, include_tables=False, favor_precision=True,
+    ) or ""
+    if len(text.strip()) >= MIN_TEXT_CHARS:
+        return text
+    recall = trafilatura.extract(
+        trafilatura.load_html(html), include_comments=False, include_tables=True, favor_recall=True,
+    ) or ""
+    return recall if len(recall.strip()) > len(text.strip()) else text
+
+
+def _limit(text: str, limit: int) -> str:
+    text = re.sub(r"\s+", " ", text).strip()
+    if len(text) <= limit:
+        return text
+    cut = text[: limit - 1]
+    if " " in cut[limit // 2:]:
+        cut = cut[: cut.rfind(" ")]
+    return cut.rstrip(" ,;:-") + "…"
+
+
+def page_headings(doc, title: Optional[str], names: set[str]) -> list[str]:
+    """Up to 5 real headings (h1-h3) of the article, scrubbed. The headline itself, navigation labels,
+    shouted headings and boilerplate are skipped."""
+    title_key = _norm(title) if title else ""
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in htmlmeta.headings(doc):
+        if len(raw) < 4 or raw.isupper() or BOILERPLATE.search(raw):
+            continue
+        cleaned = redact_names(scrub(raw), names) or ""
+        key = _norm(cleaned)
+        if not key or key == title_key or key in seen:
+            continue
+        seen.add(key)
+        out.append(_limit(cleaned, MAX_HEADING_CHARS))
+        if len(out) == MAX_HEADINGS:
+            break
+    return out
+
+
+def page_summary(doc, names: set[str]) -> Optional[str]:
+    """The page's own meta description (written by the publisher), scrubbed and capped at 300 characters."""
+    raw = htmlmeta.description(doc)
+    if not raw or BOILERPLATE.search(raw) and len(raw) < 80:
+        return None
+    cleaned = redact_names(scrub(raw), names)
+    return _limit(cleaned, MAX_SUMMARY_CHARS) if cleaned else None
+
+
+def _company_fields(guess: Optional[CompanyGuess]) -> dict:
+    if guess is None:
+        return {"company": None}
+    return {"company": guess.name, "company_method": guess.method, "company_confidence": guess.confidence,
+            "company_evidence": guess.evidence}
+
+
+def _competitor_guess(source: Source) -> Optional[CompanyGuess]:
+    name = company_from_source_name(source.name)
+    return CompanyGuess(name, "competitor_source", "high", f"page on {source.name}") if name else None
+
+
 # ---------- main entry point ----------
 
 def extract_item(page: FetchedPage, source: Source) -> Item:
@@ -821,18 +896,19 @@ def extract_item(page: FetchedPage, source: Source) -> Item:
     tree = trafilatura.load_html(page.html) if page.html and page.html.strip() else None
     if tree is None:
         raise ValueError(f"unparseable page: {page.final_url}")
+    doc = htmlmeta.parse(page.html)  # our own copy for headings, JSON-LD and meta tags
 
-    text = trafilatura.extract(
-        tree, include_comments=False, include_tables=False, favor_precision=True,
-    ) or ""
+    text = _main_text(page.html)
     meta = trafilatura.extract_metadata(tree)
 
-    raw_title = (getattr(meta, "title", None) if meta else None) or page.listing_title
+    raw_title = ((getattr(meta, "title", None) if meta else None)
+                 or htmlmeta.meta_content(doc, "og:title", "twitter:title")
+                 or htmlmeta.first_h1(doc) or page.listing_title)
     raw_title = raw_title.strip() if raw_title and raw_title.strip() else None
     raw_title = strip_site_suffix(raw_title, source.name)
     strict_meta = trafilatura.extract_metadata(trafilatura.load_html(page.html), extensive=False)
     meta_date = trusted_metadata_date(
-        getattr(strict_meta, "date", None) if strict_meta else None,
+        (getattr(strict_meta, "date", None) if strict_meta else None) or htmlmeta.jsonld_date(doc),
         getattr(meta, "date", None) if meta else None,
     )
     published_at = parse_published_date(meta_date) or parse_published_date(page.listing_published)
@@ -840,12 +916,15 @@ def extract_item(page: FetchedPage, source: Source) -> Item:
     keywords = _load_keywords()
     names = person_name_tokens(raw_title, text)  # surnames that Presidio misses when they stand alone
     title = redact_names(scrub(raw_title), names)  # Presidio runs on the title in every case
+    extras = dict(headings=page_headings(doc, title, names), summary=page_summary(doc, names),
+                  image_url=htmlmeta.og_image(doc, page.final_url))
 
     if len(text.strip()) < MIN_TEXT_CHARS:
         # Empty or very short page: keep what exists, never invent the rest. Region, event type and
         # product may still be stated in the title or the few words there are.
         short_text = redact_names(scrub(text), names) or "" if text.strip() else ""
-        company = company_from_source_name(source.name) if source.type == "competitor" else None
+        guess = _competitor_guess(source) if source.type == "competitor" else None
+        company = guess.name if guess else None
         item = Item(
             id=make_item_id(page.final_url), source_id=source.source_id, source_name=source.name,
             source_type=source.type, source_url=page.final_url, licence_note=source.licence_note,
@@ -856,6 +935,7 @@ def extract_item(page: FetchedPage, source: Source) -> Item:
             personal_data_removed=True, matched_keywords=[], mentions_us_location=False,
             industrial_hint=False, region=detect_region(source, title, short_text),
             event_type=classify_event(title, opening_sentences(short_text, title)),
+            **{k: v for k, v in _company_fields(guess).items() if k != "company"}, **extras,
         )
         text = short_text = ""
         return item
@@ -868,9 +948,12 @@ def extract_item(page: FetchedPage, source: Source) -> Item:
     mentions_us = any(_found_location(t, haystack) for t in keywords["us_locations"])
 
     if source.type == "competitor":
-        company = company_from_source_name(source.name)
+        guess = _competitor_guess(source)
     else:
-        company = _company_from_aliases(title, clean_text) or _company_from_orgs(title, clean_text, source.name)
+        guess = discover_company(title, clean_text, source.name, doc=doc,
+                                 alias_lookup=_company_from_aliases, org_lookup=_company_from_orgs)
+    company_fields = _company_fields(guess)
+    company = company_fields.pop("company")
 
     facts = [f for f in (scrub(f) for f in _key_facts(clean_text, keywords["compressor"], title)) if f]
     facts = [_shorten(f) for f in facts][:MAX_KEY_FACTS]
@@ -884,6 +967,7 @@ def extract_item(page: FetchedPage, source: Source) -> Item:
         personal_data_removed=True, matched_keywords=matched, mentions_us_location=mentions_us,
         industrial_hint=industrial_hint, region=detect_region(source, title, clean_text),
         event_type=classify_event(title, opening_sentences(clean_text, title)),
+        **company_fields, **extras,
     )
     # Drop the text: nothing below this point may keep it.
     text = clean_text = haystack = ""

@@ -35,6 +35,14 @@ SummaryKind = Literal["registered", "discovered", "fallback"]
 
 KeyFact = Annotated[str, StringConstraints(max_length=200)]
 
+# ---- phase 3: company discovery, validation, company profiles ----
+CompanyMethod = Literal[
+    "competitor_source", "alias_list", "ticker", "about_section", "headline", "structured_data", "org_mentions",
+]
+Confidence = Literal["high", "medium", "low"]
+ValidationStatus = Literal["confirmed", "not_confirmed"]
+Heading = Annotated[str, StringConstraints(max_length=120)]
+
 
 # ---------- helpers ----------
 
@@ -178,6 +186,24 @@ class Item(BaseModel):
     fallback_for: Optional[str] = None  # source_id of the refused source this item substitutes for
     watch_matches: list[str] = Field(default_factory=list)  # watchlist names found in title/text
 
+    # phase 3 (all optional, so phase 1 and 2 records stay valid)
+    company_method: Optional[CompanyMethod] = None  # which rule found `company`
+    company_confidence: Optional[Confidence] = None
+    company_evidence: Optional[str] = Field(default=None, max_length=160)  # the short phrase that named it
+    headings: list[Heading] = Field(default_factory=list)  # up to 5 page headings (h1-h3), scrubbed
+    summary: Optional[str] = Field(default=None, max_length=300)  # the page's own meta description, scrubbed
+    image_url: Optional[str] = None  # the page's og:image (a link only; the image is not copied)
+    validation: Optional["Validation"] = None  # set by atlas.validate after the run
+
+
+class Validation(BaseModel):
+    """Confirmed / Not confirmed, with the rule that decided it and the links that back it."""
+
+    status: ValidationStatus = "not_confirmed"
+    criteria_met: list[str] = Field(default_factory=list)  # e.g. "corroborated by 2 independent sources"
+    reasons: list[str] = Field(default_factory=list)  # why it is not (yet) confirmed
+    evidence_urls: list[str] = Field(default_factory=list)
+
 
 class CleanResult(BaseModel):
     items: list[Item]
@@ -233,6 +259,7 @@ class ScoutSettings(BaseModel):
     max_items_per_source: int = Field(20, ge=1, le=100)
     # scout engine
     discovery_enabled: bool = False
+    search_api_enabled: bool = False  # phase 3: official search API (Firecrawl) for discovery; needs FIRECRAWL_API_KEY
     fallback_enabled: bool = True
     fallback_max_items_per_source: int = Field(40, ge=1, le=200)
     watchlist: list[WatchEntry] = Field(default_factory=list)
@@ -306,6 +333,59 @@ class OutputEnvelope(BaseModel):
     candidates_considered: int = 0
 
 
+class CompanyContact(BaseModel):
+    """A contact detail of a company (never of a person), read from the company's own website."""
+
+    kind: Literal["email", "phone", "address", "website"]
+    value: str = Field(max_length=300)
+    found_on: list[str] = Field(default_factory=list)  # page URLs where it appeared
+    method: Literal["structured_data", "mailto_link", "tel_link", "labelled_text", "address_tag", "register"] = "labelled_text"
+    validation: Validation = Field(default_factory=Validation)
+
+
+class CompanyImage(BaseModel):
+    """A link to a logo or image. Only the logo is copied (to the Volume, for the company report)."""
+
+    kind: Literal["logo", "image"]
+    url: str
+    source_url: str  # the page that pointed to it
+    alt: Optional[str] = Field(default=None, max_length=160)
+    stored_path: Optional[str] = None  # Volume path of the stored copy (logo only)
+
+
+class CompanyProfile(BaseModel):
+    """Everything known about one company in one run: its items, contacts, images and validation."""
+
+    company_id: str  # slug, e.g. "kaeser-compressors"
+    name: str
+    website: Optional[str] = None
+    item_ids: list[str] = Field(default_factory=list)
+    confirmed_item_ids: list[str] = Field(default_factory=list)
+    source_ids: list[str] = Field(default_factory=list)
+    story_ids: list[str] = Field(default_factory=list)
+    event_types: dict[str, int] = Field(default_factory=dict)
+    technologies: dict[str, int] = Field(default_factory=dict)
+    regions: dict[str, int] = Field(default_factory=dict)
+    products: list[str] = Field(default_factory=list)
+    first_published: Optional[str] = None
+    last_published: Optional[str] = None
+    contacts: list[CompanyContact] = Field(default_factory=list)
+    logo: Optional[CompanyImage] = None
+    images: list[CompanyImage] = Field(default_factory=list)
+    profile_status: str = "not read yet"  # what happened when the website was read (or why it was not)
+    profile_fetched_at: Optional[str] = None
+
+
+class CompanyIndex(BaseModel):
+    """companies/<run_id>/index.json: the company-wise view of one run."""
+
+    run_id: str
+    generated_at: str
+    companies: list[CompanyProfile]
+    unattributed_item_ids: list[str] = Field(default_factory=list)  # items with no company found
+    criteria: list[str] = Field(default_factory=list)  # the validation rules used, in plain words
+
+
 class RunLog(BaseModel):
     """logs/<run_id>.json. What ran, what was blocked and why. Never page content."""
 
@@ -317,3 +397,9 @@ class RunLog(BaseModel):
     errors: list[str] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)  # phase 2: discovery and switching findings (not errors)
     counts: dict[str, dict[str, int]] = Field(default_factory=dict)  # source_id -> {collected, clean, passed}
+
+
+# Item refers to Validation, which is defined after it.
+Item.model_rebuild()
+CleanResult.model_rebuild()
+OutputEnvelope.model_rebuild()

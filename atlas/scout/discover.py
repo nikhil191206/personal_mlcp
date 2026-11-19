@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import os
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -288,15 +287,20 @@ def _outbound_from_page(doc, page_url: str, own_domain: str) -> list[tuple[str, 
 # ---------- search api (official API only; none implemented) ----------
 
 def _search_api_candidates(settings: ScoutSettings) -> list[Candidate]:
-    """Optional. Off by default. No provider is implemented: the team has not chosen an official API yet
-    (parent2 section 17, question 2). One log line, never a request to a search engine."""
+    """Optional. Off by default. Phase 3: the official Firecrawl search API, results only (see
+    atlas/scout/search_provider.py and docs/scraping_tools_evaluation.md). Never a search engine's result
+    pages. One log line when it is skipped."""
     if not getattr(settings, "search_api_enabled", False):
         log.info("search_api skipped: not enabled in the settings")
-    elif not os.environ.get("SEARCH_API_KEY"):
-        log.info("search_api skipped: SEARCH_API_KEY is not set")
-    else:
-        log.info("search_api skipped: no official provider has been chosen by the team yet")
-    return []
+        return []
+    from atlas.scout.search_provider import api_key, search_candidates
+    if not api_key():
+        log.info("search_api skipped: FIRECRAWL_API_KEY is not set")
+        return []
+    candidates, notes = search_candidates(settings)
+    for note in notes:
+        log.info(note)
+    return candidates
 
 
 # ---------- the discovery run ----------

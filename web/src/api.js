@@ -32,4 +32,6 @@ export const api = {
   setSource: (id, value) => post("/api/sources", { id, value }),
   rerun: () => request("/api/rerun"),
   report: async (runId, fmt) => (await request(`/api/reports/${runId}/${fmt}`, { method: "POST" })).blob(),
+  companies: (runId) => request(`/api/companies/${runId}`),
+  companyReport: async (runId, id, fmt) => (await request(`/api/companies/${runId}/${id}/report/${fmt}`, { method: "POST" })).blob(),
 };
