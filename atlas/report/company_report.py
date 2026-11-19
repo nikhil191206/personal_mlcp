@@ -1,5 +1,7 @@
-"""One report per company (phase 3, task 10): logo, contact details, news and facts with their validation
-status, images, sources and the rules used. PDF (reportlab, A4) or PPTX (python-pptx, 16:9).
+"""One report per company (phase 3, task 10). Page 1 is the company profile sheet in Atlas Copco's
+market-intelligence format (atlas/report/company_sheet.py). The pages after it are the evidence: at a glance,
+contact details, news and facts with their validation status, images, sources and the rules used.
+PDF (reportlab, landscape A4) or PPTX (python-pptx, 16:9).
 
 Owner: Sachi. Built in memory from a CompanyProfile and its validated items; `write_company_report` uploads
 it to reports/companies/<run_id>/<company_id>.<fmt> through atlas.storage. Text comes from fixed templates.
@@ -14,6 +16,7 @@ from xml.sax.saxutils import escape, quoteattr
 
 from atlas.models import CompanyIndex, CompanyProfile, Item, OutputEnvelope
 from atlas.report.build import EVENT_LABELS, PREPARED_FOR, PersonalDataError, check_personal_data, truncate
+from atlas.report.company_sheet import Sheet, add_sheet_slide, build_sheet, sheet_flowables
 
 Format = Literal["pdf", "pptx"]
 STATUS_TEXT = {"confirmed": "Confirmed", "not_confirmed": "Not confirmed"}
@@ -28,6 +31,7 @@ class CompanyReportData:
     criteria: list[str]
     logo_bytes: Optional[bytes] = None
     glance: list[str] = field(default_factory=list)
+    sheet: Optional[Sheet] = None
 
 
 def _n(count: int, one: str, many: Optional[str] = None) -> str:
@@ -81,7 +85,8 @@ def compute(run_id: str, profile: CompanyProfile, items: list[Item], criteria: l
     if profile.regions:
         glance.append("Regions: " + ", ".join(f"{k} ({v})" for k, v in profile.regions.items()) + ".")
     glance.append(f"Company website: {profile.profile_status}.")
-    return CompanyReportData(run_id, profile, mine, criteria, logo_bytes, glance)
+    sheet = build_sheet(profile, mine, logo_bytes)
+    return CompanyReportData(run_id, profile, mine, criteria, logo_bytes, glance, sheet)
 
 
 def _status_line(item: Item) -> str:
@@ -96,13 +101,13 @@ def _status_line(item: Item) -> str:
 
 def _pdf(d: CompanyReportData) -> bytes:
     from reportlab.lib import colors
-    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib.units import cm
-    from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+    from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-    page_w, page_h = A4
-    margin = 1.8 * cm
+    page_w, page_h = landscape(A4)
+    margin = 1.4 * cm
     frame_w = page_w - 2 * margin
     base = getSampleStyleSheet()
     h1 = ParagraphStyle("H1", parent=base["Heading1"], fontSize=22, leading=27, spaceAfter=4)
@@ -131,7 +136,8 @@ def _pdf(d: CompanyReportData) -> bytes:
         return t
 
     prof = d.profile
-    story: list = []
+    story: list = sheet_flowables(d.sheet, frame_w) + [PageBreak()] if d.sheet else []
+    story.append(p("Evidence for this profile", ParagraphStyle("Kick", parent=small, fontSize=9, textColor=colors.HexColor("#0B4F5C"))))
     if d.logo_bytes:
         try:
             img = Image(BytesIO(d.logo_bytes))
@@ -188,15 +194,15 @@ def _pdf(d: CompanyReportData) -> bytes:
         canvas.saveState()
         canvas.setFont("Helvetica", 8)
         canvas.setFillColor(colors.HexColor("#666666"))
-        canvas.drawString(margin, page_h - 1.1 * cm, f"{prof.name}  |  company report  |  run {d.run_id}")
-        canvas.drawString(margin, 1.0 * cm, PREPARED_FOR)
-        canvas.drawRightString(page_w - margin, 1.0 * cm, f"Page {doc.page}")
+        canvas.drawString(margin, page_h - 0.9 * cm, f"{prof.name}  |  company profile  |  run {d.run_id}")
+        canvas.drawString(margin, 0.7 * cm, PREPARED_FOR)
+        canvas.drawRightString(page_w - margin, 0.7 * cm, f"Page {doc.page}")
         canvas.restoreState()
 
     buf = BytesIO()
-    SimpleDocTemplate(buf, pagesize=A4, leftMargin=margin, rightMargin=margin, topMargin=margin, bottomMargin=margin,
+    SimpleDocTemplate(buf, pagesize=landscape(A4), leftMargin=margin, rightMargin=margin, topMargin=margin, bottomMargin=margin,
                       title=f"{prof.name} - company report - run {d.run_id}", author="Group 8, VIT Pune",
-                      invariant=1).build(story, onFirstPage=decorate, onLaterPages=decorate)
+                      invariant=1, pageCompression=0).build(story, onFirstPage=decorate, onLaterPages=decorate)
     return buf.getvalue()
 
 
@@ -245,12 +251,9 @@ def _pptx(d: CompanyReportData) -> bytes:
                     for run in para.runs:
                         run.font.size = Pt(11 if r == 0 else 10)
 
-    s = slide(prof.name)
-    if d.logo_bytes:
-        try:
-            s.shapes.add_picture(BytesIO(d.logo_bytes), Inches(10.8), Inches(0.3), height=Inches(0.9))
-        except Exception:
-            pass
+    if d.sheet:
+        add_sheet_slide(prs, d.sheet)
+    s = slide(f"{prof.name}: evidence at a glance")
     lines(s, 1.3, [prof.website or "website not on file", f"Company report, run {d.run_id}", ""] + d.glance, size=16)
 
     s = slide("Contact details")

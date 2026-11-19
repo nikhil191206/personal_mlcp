@@ -76,7 +76,7 @@ def test_pdf_and_pptx_reports(logo):
     assert pdf.startswith(b"%PDF") and b"Borealis Vacuum" in pdf
     pptx = build_company_report(data, "pptx")
     prs = Presentation(io.BytesIO(pptx))
-    assert len(prs.slides) == 4  # title, contacts, news, validation rules
+    assert len(prs.slides) == 5  # profile sheet, at a glance, contacts, news, validation rules
     assert len(data.items) == 2 and "2 news items in this run, 2 confirmed" in data.glance[0]
 
 

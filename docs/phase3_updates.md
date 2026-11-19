@@ -1,7 +1,7 @@
 # Scout phase 3: what changed
 
 All 10 tasks from the Scout task breakdown are covered. Tasks 5 and 9 are research only, with no code
-changes. The test suite grew from 461 to 504 tests, all passing, and the website builds.
+changes. The test suite grew from 461 to 508 tests, all passing, and the website builds.
 
 ## Built
 
@@ -43,9 +43,13 @@ contact / about pages through the Compliance Gate. It keeps role emails only (in
 company's domain, phone numbers (not fax), addresses, the logo (copied to the Volume) and image links.
 Personal emails are counted and dropped. Sites the register refuses are not read.
 
-**10. Company reports.** New `atlas/report/company_report.py` builds one PDF and/or PowerPoint per company:
-logo, at a glance, contacts with status, news with each item's validation, images, sources and the
-rules. Run `python -m atlas.companies --fetch-profiles --reports both`, or use the buttons on the
+**10. Company reports.** New `atlas/report/company_report.py` builds one PDF and/or PowerPoint per company.
+Page 1 follows Atlas Copco's market-intelligence format (`atlas/report/company_sheet.py`): company name,
+logo top right, and six teal-labelled boxes (business and ownership, products/markets/finances,
+technology description, technology assessment, value for Atlas Copco, links). Gaps are written as "not
+stated in the collected sources (to complete)", unconfirmed facts carry a `*`, and every fact links to its
+source. The pages after it are the evidence: contacts with status, news with each item's validation,
+images, sources and the rules. Run `python -m atlas.companies --fetch-profiles --reports both`, or use the buttons on the
 Companies page.
 
 ## Researched only (no code changes)
@@ -64,8 +68,8 @@ In short:
 ## Changed files
 
 - New: `atlas/company.py`, `atlas/htmlmeta.py`, `atlas/validate.py`, `atlas/companies.py`,
-  `atlas/profile.py`, `atlas/report/company_report.py`, `atlas/scout/search_provider.py`,
-  `config/companies.yaml`, `web/src/pages/Companies.jsx`, 6 test files, 5 docs and 2 diagram images.
+  `atlas/profile.py`, `atlas/report/company_report.py`, `atlas/report/company_sheet.py`, `atlas/scout/search_provider.py`,
+  `config/companies.yaml`, `web/src/pages/Companies.jsx`, 7 test files, 5 docs and 2 diagram images.
 - Edited: `atlas/models.py` (new optional fields and models, so old outputs still load), `atlas/extract.py`,
   `atlas/run.py` (validation and company index at the end of a run), `atlas/scout/discover.py`,
   `atlas/settings.py`, `atlas/storage.py`, `atlas/report/build.py` (image links are not mistaken for emails),
