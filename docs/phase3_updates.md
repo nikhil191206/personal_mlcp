@@ -43,18 +43,21 @@ contact / about pages through the Compliance Gate. It keeps role emails only (in
 company's domain, phone numbers (not fax), addresses, the logo (copied to the Volume) and image links.
 Personal emails are counted and dropped. Sites the register refuses are not read.
 
-**10. Company reports.** New `atlas/report/company_report.py` builds one PDF and/or PowerPoint per company.
-Page 1 follows Atlas Copco's market-intelligence format (`atlas/report/company_sheet.py`): company name,
-logo top right, and six teal-labelled boxes (business and ownership, products/markets/finances,
+**10. Company reports.** New `atlas/report/company_report.py` builds a one-page PDF and/or a one-slide
+PowerPoint per company, in Atlas Copco's market-intelligence format only (`atlas/report/company_sheet.py`):
+company name, logo top right, the report date and company contact under the title, and six teal-labelled boxes (business and ownership, products/markets/finances,
 technology description, technology assessment, value for Atlas Copco, links). Gaps are written as "not
 stated in the collected sources (to complete)", unconfirmed facts carry a `*`, and every fact links to its
-source. The pages after it are the evidence: contacts with status, news with each item's validation,
-images, sources and the rules. Run `python -m atlas.companies --fetch-profiles --reports both`, or use the buttons on the
+source. The full evidence (each item's validation, contacts with status, images, sources) stays in
+`companies/<run_id>/<company_id>.json` and on the Companies page. Run `python -m atlas.companies --fetch-profiles --reports both`, or use the buttons on the
 Companies page.
 
 ## Researched only (no code changes)
 
-**5. Blocked websites** and **9. Agentic approach**: `docs/research_blocked_sites_and_agents.md`.
+**5. Blocked websites** and **9. Agentic approach**: `docs/research_blocked_sites_and_agents.md`. It now
+has a "Legal basis" section: the case law (hiQ v LinkedIn, Meta v Bright Data), how each step stands, and the
+rules that keep the pipeline legal (terms beat tools, no bypassing blocks, facts and links only, role
+mailboxes only). It needs review by Atlas Copco's legal team.
 In short:
 - Blocked sites: classify each refusal (owner refused, bot wall, rate limited, technical, gated), then use
   allowed routes only: official APIs (SEC EDGAR for listed companies, GDELT for news mentions), coverage

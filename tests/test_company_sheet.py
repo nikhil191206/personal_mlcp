@@ -57,7 +57,21 @@ def test_every_box_fits_its_space():
     assert fit([Line("x" * 500)], 3) == []
 
 
-def test_sheet_is_the_first_page_in_both_formats():
+def test_report_is_one_page_with_date_and_contact():
+    index, items = setup()
+    d = compute("20261119T155035Z", index.companies[0], items, index.criteria)
+    assert d.sheet.report_date == "19 November 2026"
+    assert d.sheet.info_line.startswith("Report date: 19 November 2026") and "Contact: " in d.sheet.info_line
+    assert NOT_STATED in d.sheet.contact  # no contacts read for this company yet: said, not invented
+    prs = Presentation(io.BytesIO(build_company_report(d, "pptx")))
+    assert len(prs.slides) == 1
+    texts = [sh.text_frame.text for sh in prs.slides[0].shapes if sh.has_text_frame]
+    assert d.sheet.info_line in texts
+    pdf = build_company_report(d, "pdf")
+    assert b"Report date: 19 November 2026" in pdf and b"/Count 1" in pdf
+
+
+def test_sheet_is_the_only_page_in_both_formats():
     index, items = setup()
     d = compute("20261119T000000Z", index.companies[0], items, index.criteria)
     prs = Presentation(io.BytesIO(build_company_report(d, "pptx")))

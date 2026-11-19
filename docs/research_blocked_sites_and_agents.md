@@ -70,6 +70,58 @@ flowchart TD
 7. **Show it.** The Sources page's Blocked tab shows the reason in plain words, the next step and what
    coverage was found elsewhere.
 
+### Legal basis and the rules that keep it legal
+
+This section is the team's reading of public case law and the data providers' own terms. It is not legal
+advice. Atlas Copco's legal team should review it before anything here is built.
+
+Two kinds of law matter for scraping.
+
+The US anti-hacking law (CFAA). In hiQ v LinkedIn (9th Cir., April 2022) the court held that scraping pages
+that are public, with no login or password, is likely not access "without authorization". The court read the
+CFAA as an anti-intrusion law. The pipeline above never goes behind a login, a paywall or a block, so it stays
+inside what that ruling allows.
+
+Contract, through a site's terms of use. This is the bigger risk. hiQ won the CFAA point and still lost: in
+November 2022 LinkedIn won summary judgment on breach of contract, and in December 2022 hiQ settled with a
+permanent injunction to stop scraping and delete the code and data. Meta v Bright Data (N.D. Cal., January
+2024) went the other way, but only because Meta's terms applied to logged-in users. Most courts have ruled
+against scrapers who knew the terms forbade scraping. So a site whose terms forbid automated access is a hard
+stop, which is what the Compliance Gate already does with `terms_forbid_automation`.
+
+How each step of the pipeline stands:
+
+| Step | Status | Condition |
+|---|---|---|
+| 1. Classify refusals | Allowed | Internal record only |
+| 2. SEC EDGAR | Allowed | Declared User-Agent with a contact address, at most 10 requests per second |
+| 2. GDELT DOC API | Allowed | GDELT allows any academic, commercial or government use of its data. That covers the links and metadata, not the articles: each article still goes through the gate for its own site |
+| 2. Company RSS or sitemap | Allowed only if | robots.txt allows those paths and the terms do not forbid automated access |
+| 3. Coverage from allowed sources | Allowed | Each source passes the gate on its own |
+| 4. Permission emails | Allowed | Keep the written reply and record what was allowed (pages, rate) |
+| 5. Rate-limit retry | Allowed | Next run only, slower, never IP rotation |
+| 5. Playwright for JavaScript pages | Allowed only if | robots.txt and the terms both allow access. Never used to get past a block |
+| 6. Monthly re-check | Required | Terms change; a site that allowed us may stop |
+
+Rules the pipeline must follow:
+
+1. Terms beat tools. If a site's terms forbid automated access we do not read it with any tool: our
+   collector, Playwright or Firecrawl. Using a service to fetch the page does not move the responsibility.
+2. No logins, paywalls, account credentials, stealth or residential proxies, CAPTCHA solving, spoofed
+   User-Agents, or archive and cache copies of a refused page.
+3. Store facts and links, not articles. Facts are not protected by copyright, article text and photos are.
+   Reports keep short facts in our own words, the source link and images as links. Only the company logo is
+   copied, for identification.
+4. Personal data. Atlas Copco is in the EU, so GDPR applies, and India's DPDP Act may apply to the team's
+   side. Keep role mailboxes only (info@, sales@), which the profile reader already does. Set a retention
+   period for raw pages and a way to delete a company's data on request.
+5. Identify ourselves. Keep the honest User-Agent with a contact address so a site owner can reach us.
+6. Keep the gate's log of every allow and refuse decision. It is the record that we acted in good faith.
+
+Questions for Atlas Copco's legal team: are GDELT and SEC EDGAR acceptable sources; how long may we keep
+collected pages; is there a list of sites they want excluded; do they hold licences to trade publications we
+could use.
+
 ### What to build first, if the team agrees
 
 1. Reason classification and a "next step" column on the Blocked tab (small, no new network access).
@@ -146,6 +198,12 @@ report should then mark which fields came from a model.
 
 ## Sources
 
+- [hiQ v. LinkedIn wrapped up: web scraping lessons learned (ZwillGen)](https://www.zwillgen.com/alternative-data/hiq-v-linkedin-wrapped-up-web-scraping-lessons-learned/)
+- [Ninth Circuit reaffirms narrow reading of the CFAA in hiQ v. LinkedIn (Haynes Boone)](https://www.haynesboone.com/news/publications/ninth-circuit-rejects-linkedin-attempt-to-prevent-web-scraping-of-publicly-member-profiles)
+- [LinkedIn v. hiQ settlement and the contract risk (Morgan Lewis)](https://www.morganlewis.com/blogs/sourcingatmorganlewis/2022/12/linkedin-v-hiq-landmark-data-scraping-suit-provides-guidance-to-data-scrapers-and-web-operators)
+- [Meta v. Bright Data summary judgment (Farella Braun + Martel)](https://www.fbm.com/data-analytics/publications/major-decision-affects-law-of-scraping-and-online-data-collection-meta-platforms-v-bright-data/)
+- [Judge sides against Meta over scraping public data (MediaPost)](https://www.mediapost.com/publications/article/392920/bright-data-didnt-violate-metas-terms-by-scrapin.html)
+- [GDELT terms of use](https://www.gdeltproject.org/about.html)
 - [Building effective agents (Anthropic)](https://www.anthropic.com/engineering/building-effective-agents)
 - [Accessing EDGAR data: fair access, User-Agent, 10 requests per second (SEC)](https://www.sec.gov/os/accessing-edgar-data)
 - [SEC developer resources](https://www.sec.gov/developer)

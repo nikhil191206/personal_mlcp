@@ -94,7 +94,7 @@ export default function Companies() {
     <>
       <PageHead kicker="Company-wise" title="Companies">
         Every company found in this run, with its news, which facts are confirmed and why, its contact details and a
-        report per company. Contacts and logos appear after <span className="mono">python -m atlas.companies --fetch-profiles</span>.
+        one-page report per company. Contacts and logos appear after <span className="mono">python -m atlas.companies --fetch-profiles</span>.
       </PageHead>
       <Async state={state} loading="Grouping the run by company...">
         {(data) => {

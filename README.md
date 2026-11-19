@@ -50,8 +50,8 @@ tried (no coverage found in the pages read), 0 errors. Reports: `reports/report_
 
 ## Phase 3 (company view)
 
-- `python -m atlas.companies --fetch-profiles --reports both` builds one profile and one report per company
-  (contacts, logo, images, Confirmed / Not confirmed items). A normal run already writes `companies/<run>/index.json`.
+- `python -m atlas.companies --fetch-profiles --reports both` builds one profile and a one-page report per company
+  in Atlas Copco's market-intelligence format (report date and company contact under the title). A normal run already writes `companies/<run>/index.json`.
 - The website has a new Companies page.
 - Docs: `docs/architecture.md` (diagrams and workflow), `docs/company_profiles.md` (rules and commands),
   `docs/scraping_tools_evaluation.md`, `docs/research_blocked_sites_and_agents.md` (proposals, not built).

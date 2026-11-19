@@ -1,7 +1,8 @@
-"""One report per company (phase 3, task 10). Page 1 is the company profile sheet in Atlas Copco's
-market-intelligence format (atlas/report/company_sheet.py). The pages after it are the evidence: at a glance,
-contact details, news and facts with their validation status, images, sources and the rules used.
-PDF (reportlab, landscape A4) or PPTX (python-pptx, 16:9).
+"""One report per company (phase 3, task 10): a single page, the company profile sheet in Atlas Copco's
+market-intelligence format (atlas/report/company_sheet.py), with the report date and the company's contacts
+under the title. PDF (reportlab, one landscape A4 page) or PPTX (python-pptx, one 16:9 slide). The full
+evidence (every item with its validation, contacts, images, sources) stays in companies/<run_id>/<company_id>.json
+and on the Companies page.
 
 Owner: Sachi. Built in memory from a CompanyProfile and its validated items; `write_company_report` uploads
 it to reports/companies/<run_id>/<company_id>.<fmt> through atlas.storage. Text comes from fixed templates.
@@ -12,15 +13,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from io import BytesIO
 from typing import Literal, Optional
-from xml.sax.saxutils import escape, quoteattr
 
 from atlas.models import CompanyIndex, CompanyProfile, Item, OutputEnvelope
-from atlas.report.build import EVENT_LABELS, PREPARED_FOR, PersonalDataError, check_personal_data, truncate
+from atlas.report.build import EVENT_LABELS, PersonalDataError, check_personal_data
 from atlas.report.company_sheet import Sheet, add_sheet_slide, build_sheet, sheet_flowables
 
 Format = Literal["pdf", "pptx"]
-STATUS_TEXT = {"confirmed": "Confirmed", "not_confirmed": "Not confirmed"}
-ROWS_PER_SLIDE = 7
 
 
 @dataclass
@@ -85,198 +83,53 @@ def compute(run_id: str, profile: CompanyProfile, items: list[Item], criteria: l
     if profile.regions:
         glance.append("Regions: " + ", ".join(f"{k} ({v})" for k, v in profile.regions.items()) + ".")
     glance.append(f"Company website: {profile.profile_status}.")
-    sheet = build_sheet(profile, mine, logo_bytes)
+    sheet = build_sheet(profile, mine, logo_bytes, report_date(run_id))
     return CompanyReportData(run_id, profile, mine, criteria, logo_bytes, glance, sheet)
 
 
-def _status_line(item: Item) -> str:
-    v = item.validation
-    if v is None:
-        return "Not checked"
-    detail = "; ".join(v.criteria_met if v.status == "confirmed" else v.reasons)
-    return f"{STATUS_TEXT[v.status]}: {detail}" if detail else STATUS_TEXT[v.status]
+def report_date(run_id: str) -> str:
+    """The run's date as '19 November 2026' (run ids look like 20261119T155035Z); today's date if it is not one."""
+    from datetime import datetime, timezone
+    try:
+        day = datetime.strptime(run_id, "%Y%m%dT%H%M%SZ")
+    except ValueError:
+        day = datetime.now(timezone.utc)
+    return f"{day.day} {day:%B %Y}"
 
 
-# ---------- PDF ----------
+# ---------- PDF: one landscape A4 page ----------
 
 def _pdf(d: CompanyReportData) -> bytes:
-    from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4, landscape
-    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib.units import cm
-    from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+    from reportlab.platypus import SimpleDocTemplate
 
-    page_w, page_h = landscape(A4)
-    margin = 1.4 * cm
-    frame_w = page_w - 2 * margin
-    base = getSampleStyleSheet()
-    h1 = ParagraphStyle("H1", parent=base["Heading1"], fontSize=22, leading=27, spaceAfter=4)
-    h2 = ParagraphStyle("H2", parent=base["Heading2"], fontSize=13, leading=16, spaceBefore=10, spaceAfter=6)
-    body = ParagraphStyle("Body", parent=base["BodyText"], fontSize=9.5, leading=13)
-    small = ParagraphStyle("Small", parent=body, fontSize=8, leading=10, textColor=colors.HexColor("#555555"))
-    cell = ParagraphStyle("Cell", parent=body, fontSize=7.5, leading=9.2)
-    head = ParagraphStyle("Head", parent=cell, fontName="Helvetica-Bold")
-
-    def p(text: str, style=body) -> Paragraph:
-        return Paragraph(escape(text), style)
-
-    def link(text: str, url: Optional[str], style=cell) -> Paragraph:
-        if not url:
-            return p(text, style)
-        return Paragraph(f'<a href={quoteattr(url)} color="#0072B2">{escape(text)}</a>', style)
-
-    def table(header, rows, widths):
-        data = [[p(h, head) for h in header]] + [[c if isinstance(c, Paragraph) else p(str(c), cell) for c in r] for r in rows]
-        t = Table(data, colWidths=[frame_w * w / sum(widths) for w in widths], repeatRows=1, splitByRow=1)
-        t.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E8E8E8")),
-            ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#BBBBBB")),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ]))
-        return t
-
-    prof = d.profile
-    story: list = sheet_flowables(d.sheet, frame_w) + [PageBreak()] if d.sheet else []
-    story.append(p("Evidence for this profile", ParagraphStyle("Kick", parent=small, fontSize=9, textColor=colors.HexColor("#0B4F5C"))))
-    if d.logo_bytes:
-        try:
-            img = Image(BytesIO(d.logo_bytes))
-            ratio = img.imageHeight / float(img.imageWidth or 1)
-            img.drawWidth = min(5 * cm, 2.2 * cm / ratio if ratio else 5 * cm)
-            img.drawHeight = img.drawWidth * ratio
-            img.hAlign = "LEFT"
-            story += [img, Spacer(1, 6)]
-        except Exception:  # an SVG or broken image: the link is still listed below
-            pass
-    story.append(p(prof.name, h1))
-    story.append(link(prof.website or "website not on file", prof.website, body))
-    story.append(p(f"Company report, run {d.run_id}", small))
-    story.append(p("At a glance", h2))
-    story += [Paragraph(escape(line), body, bulletText="•") for line in d.glance]
-
-    story.append(p("Contact details", h2))
-    if prof.contacts:
-        rows = [[c.kind, c.value, STATUS_TEXT[c.validation.status] + (f": {'; '.join(c.validation.criteria_met or c.validation.reasons)}"),
-                 link(truncate(c.found_on[0], 60) if c.found_on else "-", c.found_on[0] if c.found_on else None)]
-                for c in prof.contacts]
-        story.append(table(["Type", "Detail", "Status", "Where found"], rows, [2, 6, 5, 5]))
-    else:
-        story.append(p(f"No contact details yet. Company website: {prof.profile_status}."))
-    story.append(p("Company contact details only (role mailboxes, main numbers, offices); personal contacts are never kept.", small))
-
-    story.append(p("News and facts", h2))
-    if d.items:
-        rows = [[i.published_at or "(no date)", EVENT_LABELS.get(i.event_type or "", i.event_type or "-"),
-                 link(truncate(i.title or "(no title)", 90), i.source_url),
-                 truncate(i.key_facts[0], 160) if i.key_facts else "-", i.label, _status_line(i)] for i in d.items]
-        story.append(table(["Date", "Type", "Headline (link)", "Key fact", "Label", "Validation"], rows, [2.5, 2.3, 5, 5.6, 1.3, 4.3]))
-    else:
-        story.append(p("No items for this company in this run."))
-
-    if prof.logo or prof.images:
-        story.append(p("Logo and images (links)", h2))
-        rows = [[img.kind, link(truncate(img.url, 70), img.url), link(truncate(img.source_url, 50), img.source_url), img.alt or ""]
-                for img in ([prof.logo] if prof.logo else []) + prof.images]
-        story.append(table(["Kind", "Image", "Found on", "Description"], rows, [1.5, 6, 5, 4]))
-        story.append(p("Only the logo is copied (for identification in this report); other images are links.", small))
-
-    story.append(p("Sources", h2))
-    by_source: dict[str, list[Item]] = {}
-    for i in d.items:
-        by_source.setdefault(i.source_name, []).append(i)
-    story.append(table(["Source", "Items", "Confirmed"],
-                       [[name, len(its), sum(1 for i in its if i.validation and i.validation.status == "confirmed")]
-                        for name, its in sorted(by_source.items())], [8, 2, 2]))
-    story.append(p("How items and contacts are validated", h2))
-    story += [Paragraph(escape(line), body, bulletText="•") for line in d.criteria]
-
-    def decorate(canvas, doc) -> None:
-        canvas.saveState()
-        canvas.setFont("Helvetica", 8)
-        canvas.setFillColor(colors.HexColor("#666666"))
-        canvas.drawString(margin, page_h - 0.9 * cm, f"{prof.name}  |  company profile  |  run {d.run_id}")
-        canvas.drawString(margin, 0.7 * cm, PREPARED_FOR)
-        canvas.drawRightString(page_w - margin, 0.7 * cm, f"Page {doc.page}")
-        canvas.restoreState()
-
+    margin = 1.2 * cm
+    frame_w = landscape(A4)[0] - 2 * margin
+    pages: list[int] = []
     buf = BytesIO()
     SimpleDocTemplate(buf, pagesize=landscape(A4), leftMargin=margin, rightMargin=margin, topMargin=margin, bottomMargin=margin,
-                      title=f"{prof.name} - company report - run {d.run_id}", author="Group 8, VIT Pune",
-                      invariant=1, pageCompression=0).build(story, onFirstPage=decorate, onLaterPages=decorate)
+                      title=f"{d.profile.name} - company profile - {d.sheet.report_date}", author="Group 8, VIT Pune",
+                      invariant=1, pageCompression=0).build(sheet_flowables(d.sheet, frame_w),
+                                                            onFirstPage=lambda c, doc: pages.append(doc.page),
+                                                            onLaterPages=lambda c, doc: pages.append(doc.page))
+    if len(pages) != 1:
+        raise RuntimeError(f"{d.profile.name}: the profile sheet ran onto {len(pages)} pages; it must fit one")
     return buf.getvalue()
 
 
-# ---------- PPTX ----------
+# ---------- PPTX: one 16:9 slide ----------
 
 def _pptx(d: CompanyReportData) -> bytes:
     from pptx import Presentation
-    from pptx.dml.color import RGBColor
-    from pptx.util import Inches, Pt
+    from pptx.util import Inches
 
     prs = Presentation()
     prs.slide_width, prs.slide_height = Inches(13.333), Inches(7.5)
-    blank = prs.slide_layouts[6]
-    prof = d.profile
-
-    def slide(title: str):
-        s = prs.slides.add_slide(blank)
-        box = s.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(12.3), Inches(0.8)).text_frame
-        box.text = title
-        box.paragraphs[0].runs[0].font.size = Pt(28)
-        box.paragraphs[0].runs[0].font.bold = True
-        foot = s.shapes.add_textbox(Inches(0.5), Inches(7.0), Inches(12.3), Inches(0.3)).text_frame
-        foot.text = PREPARED_FOR
-        foot.paragraphs[0].runs[0].font.size = Pt(9)
-        foot.paragraphs[0].runs[0].font.color.rgb = RGBColor(0x66, 0x66, 0x66)
-        return s
-
-    def lines(s, top, text_lines, size=16, height=5.5):
-        tf = s.shapes.add_textbox(Inches(0.5), Inches(top), Inches(12.3), Inches(height)).text_frame
-        tf.word_wrap = True
-        for n, line in enumerate(text_lines):
-            para = tf.paragraphs[0] if n == 0 else tf.add_paragraph()
-            para.text = line
-            for run in para.runs:
-                run.font.size = Pt(size)
-
-    def grid(s, header, rows, widths, top=1.3):
-        shape = s.shapes.add_table(len(rows) + 1, len(header), Inches(0.5), Inches(top), Inches(12.3), Inches(0.4 * (len(rows) + 1)))
-        t = shape.table
-        for c, w in enumerate(widths):
-            t.columns[c].width = Inches(12.3 * w / sum(widths))
-        for r, row in enumerate([header] + rows):
-            for c, value in enumerate(row):
-                t.cell(r, c).text = str(value)
-                for para in t.cell(r, c).text_frame.paragraphs:
-                    for run in para.runs:
-                        run.font.size = Pt(11 if r == 0 else 10)
-
-    if d.sheet:
-        add_sheet_slide(prs, d.sheet)
-    s = slide(f"{prof.name}: evidence at a glance")
-    lines(s, 1.3, [prof.website or "website not on file", f"Company report, run {d.run_id}", ""] + d.glance, size=16)
-
-    s = slide("Contact details")
-    if prof.contacts:
-        grid(s, ["Type", "Detail", "Status", "Where found"],
-             [[c.kind, c.value, STATUS_TEXT[c.validation.status], c.found_on[0] if c.found_on else "-"] for c in prof.contacts[:10]],
-             [1.5, 5, 2, 4])
-    else:
-        lines(s, 1.3, [f"No contact details yet. Company website: {prof.profile_status}."])
-
-    chunks = [d.items[i:i + ROWS_PER_SLIDE] for i in range(0, len(d.items), ROWS_PER_SLIDE)] or [[]]
-    for n, chunk in enumerate(chunks, 1):
-        s = slide("News and facts" + (f" ({n}/{len(chunks)})" if len(chunks) > 1 else ""))
-        if chunk:
-            grid(s, ["Date", "Type", "Headline", "Validation"],
-                 [[i.published_at or "(no date)", EVENT_LABELS.get(i.event_type or "", "-"), truncate(i.title or "", 80),
-                   STATUS_TEXT[i.validation.status] if i.validation else "-"] for i in chunk], [1.4, 1.8, 6.5, 2.6])
-            s.notes_slide.notes_text_frame.text = "\n".join(f"{i.title}: {i.source_url}" for i in chunk)
-        else:
-            lines(s, 1.3, ["No items for this company in this run."])
-
-    s = slide("How items and contacts are validated")
-    lines(s, 1.3, d.criteria, size=14)
+    add_sheet_slide(prs, d.sheet)
+    # the source links behind each news line, for whoever presents the slide
+    prs.slides[0].notes_slide.notes_text_frame.text = "\n".join(
+        f"{i.title or i.source_name}: {i.source_url}" for i in d.items)
     buf = BytesIO()
     prs.save(buf)
     return buf.getvalue()
