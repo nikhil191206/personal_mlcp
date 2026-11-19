@@ -74,9 +74,10 @@ def test_pdf_and_pptx_reports(logo):
     data = compute("20261119T000000Z", profile, items, index.criteria, logo)
     pdf = build_company_report(data, "pdf")
     assert pdf.startswith(b"%PDF") and b"Borealis Vacuum" in pdf
+    assert b"/Count 1" in pdf  # one page
     pptx = build_company_report(data, "pptx")
     prs = Presentation(io.BytesIO(pptx))
-    assert len(prs.slides) == 5  # profile sheet, at a glance, contacts, news, validation rules
+    assert len(prs.slides) == 1  # the profile sheet only
     assert len(data.items) == 2 and "2 news items in this run, 2 confirmed" in data.glance[0]
 
 

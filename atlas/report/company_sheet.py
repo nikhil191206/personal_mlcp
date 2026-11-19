@@ -1,7 +1,8 @@
-"""The company profile sheet: the first page of every company report, in Atlas Copco's market-intelligence
-format (reference: Market_Intelligence_Reference_format.png).
+"""The company profile sheet: the whole company report, one page, in Atlas Copco's market-intelligence format
+(reference: Market_Intelligence_Reference_format.png).
 
-Owner: Sachi. Layout: the company name as the title, the logo top right, and six labelled boxes in two columns:
+Owner: Sachi. Layout: the company name as the title, the logo top right, a line under the title with the report
+date and the company's contact details, and six labelled boxes in two columns:
 
     Business description and ownership structure | Products, markets and finances
     Technology / product / service description   | Technology assessment by Atlas Copco
@@ -29,8 +30,8 @@ TITLE_TEAL = "0E5A66"  # the company name
 NOTE_GREY = "666666"
 NOT_STATED = "not stated in the collected sources"
 UNCONFIRMED_MARK = "*"
-FOOTNOTE = ("* not yet confirmed (see the evidence pages). Lines marked 'to complete' are for Atlas Copco. "
-            "Every fact comes from the linked sources; nothing is estimated.")
+FOOTNOTE = ("* not yet confirmed (seen on one website only, with no official source or team review). "
+            "Lines marked 'to complete' are for Atlas Copco. Every fact links to its source; nothing is estimated.")
 
 MONEY_OR_NUMBER = re.compile(r"\$\s?\d|\d[\d.,]*\s?(?:%|million|billion|bn|m\b|units|employees|cfm|psi|kw|hp|mw)", re.I)
 OWNERSHIP_EVENTS = ("acquisition", "partnership", "investment_expansion", "appointment")
@@ -57,6 +58,13 @@ class Sheet:
     logo_bytes: Optional[bytes]
     sections: dict[str, list[Line]] = field(default_factory=dict)
     footnote: str = FOOTNOTE
+    report_date: str = ""
+    contact: str = ""
+
+    @property
+    def info_line(self) -> str:
+        """The line under the title: report date and company contact."""
+        return f"Report date: {self.report_date}    |    Contact: {self.contact}"
 
 
 SECTION_LABELS = {
@@ -101,7 +109,17 @@ def lines_needed(lines: list[Line], chars: int = CHARS_PER_LINE) -> int:
     return sum(max(1, math.ceil((len(l.text) + 4 * l.level) / chars)) for l in lines)
 
 
-def build_sheet(profile: CompanyProfile, items: list[Item], logo_bytes: Optional[bytes] = None) -> Sheet:
+def contact_text(profile: CompanyProfile, limit: int = 3) -> str:
+    """Company contacts for the line under the title: role emails and main phone numbers, confirmed first."""
+    contacts = sorted((c for c in profile.contacts if c.kind in ("email", "phone")),
+                      key=lambda c: (c.kind != "email", c.validation.status != "confirmed"))[:limit]
+    if not contacts:
+        return f"{NOT_STATED} (to complete)"
+    return ", ".join(f"{c.value}{'' if c.validation.status == 'confirmed' else UNCONFIRMED_MARK}" for c in contacts)
+
+
+def build_sheet(profile: CompanyProfile, items: list[Item], logo_bytes: Optional[bytes] = None,
+                report_date: str = "") -> Sheet:
     """The six boxes for one company. `items` = this company's validated items, newest first."""
     used_facts: set[str] = set()
 
@@ -191,18 +209,13 @@ def build_sheet(profile: CompanyProfile, items: list[Item], logo_bytes: Optional
     ranked = sorted(items, key=lambda i: (i.validation is None or i.validation.status != "confirmed"))
     for item in ranked[:3]:
         links.append(Line(f"{truncate(item.title or item.source_name, 80)}{_mark(item)}", url=item.source_url, whole_link=True))
-    contacts = [c for c in profile.contacts if c.kind in ("email", "phone")]
-    if contacts:
-        links.append(Line("Contact: " + ", ".join(
-            f"{c.value}{'' if c.validation.status == 'confirmed' else UNCONFIRMED_MARK}" for c in contacts[:3])))
-    else:
-        links.append(Line(f"Contact: {NOT_STATED}", note=True))
     links.append(Line("Patents: not collected yet (to complete)", note=True))
 
     sections = {"business": business, "products": products, "technology": technology,
                 "assessment": assessment, "value": value, "links": links}
     sections = {k: fit(v, CAPACITY[k]) for k, v in sections.items()}
-    return Sheet(title=profile.name, website=profile.website, logo_bytes=logo_bytes, sections=sections)
+    return Sheet(title=profile.name, website=profile.website, logo_bytes=logo_bytes, sections=sections,
+                 report_date=report_date, contact=contact_text(profile))
 
 
 # ---------- PPTX: one 16:9 slide ----------
@@ -219,12 +232,18 @@ def add_sheet_slide(prs, sheet: Sheet) -> None:
     teal, title_teal, grey = (RGBColor.from_string(c) for c in (TEAL, TITLE_TEAL, NOTE_GREY))
     s = prs.slides.add_slide(prs.slide_layouts[6])
 
-    title = s.shapes.add_textbox(Inches(0.35), Inches(0.12), Inches(10.5), Inches(0.75)).text_frame
+    title = s.shapes.add_textbox(Inches(0.35), Inches(0.08), Inches(10.8), Inches(0.6)).text_frame
     title.word_wrap = True
     title.text = sheet.title
     title.paragraphs[0].alignment = PP_ALIGN.LEFT
     run = title.paragraphs[0].runs[0]
-    run.font.size, run.font.bold, run.font.color.rgb = Pt(32), True, title_teal
+    run.font.size, run.font.bold, run.font.color.rgb = Pt(28), True, title_teal
+
+    info = s.shapes.add_textbox(Inches(0.35), Inches(0.66), Inches(10.8), Inches(0.28)).text_frame
+    info.word_wrap = True
+    info.text = sheet.info_line
+    r = info.paragraphs[0].runs[0]
+    r.font.size, r.font.color.rgb = Pt(10), RGBColor(0x33, 0x33, 0x33)
 
     # logo top right, or a dashed "LOGO" box to fill in
     if sheet.logo_bytes:
@@ -240,7 +259,7 @@ def add_sheet_slide(prs, sheet: Sheet) -> None:
         r = box.text_frame.paragraphs[0].runs[0]
         r.font.size, r.font.color.rgb = Pt(11), teal
 
-    top, heights = 0.95, [2.2, 2.4, 1.4]
+    top, heights = 1.0, [2.15, 2.35, 1.4]
     label_w, content_w, gap = 1.3, 4.95, 0.1
     col_x = [0.35, 0.35 + label_w + content_w + gap]
     outer = s.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0.3), Inches(top - 0.05),
@@ -286,7 +305,7 @@ def add_sheet_slide(prs, sheet: Sheet) -> None:
             divider.line.color.rgb = teal
             y += h
 
-    foot = s.shapes.add_textbox(Inches(0.35), Inches(7.08), Inches(12.6), Inches(0.3)).text_frame
+    foot = s.shapes.add_textbox(Inches(0.35), Inches(6.98), Inches(12.6), Inches(0.3)).text_frame
     foot.text = sheet.footnote
     r = foot.paragraphs[0].runs[0]
     r.font.size, r.font.italic, r.font.color.rgb = Pt(8), True, grey
@@ -312,6 +331,7 @@ def sheet_flowables(sheet: Sheet, frame_w: float) -> list:
     body = ParagraphStyle("SheetBody", parent=base, fontSize=7.8, leading=9.6, spaceAfter=1)
     sub = ParagraphStyle("SheetSub", parent=body, leftIndent=10, fontSize=7.3, leading=9)
     foot = ParagraphStyle("SheetFoot", parent=base, fontSize=6.8, leading=8, textColor=colors.HexColor("#" + NOTE_GREY))
+    info = ParagraphStyle("SheetInfo", parent=base, fontSize=8.5, leading=10.5, textColor=colors.HexColor("#333333"))
 
     def para(line: Line) -> Paragraph:
         text = escape(line.text)
@@ -323,7 +343,7 @@ def sheet_flowables(sheet: Sheet, frame_w: float) -> list:
             text += f' <a href={quoteattr(line.url)} color="#0072B2"><font size="6.5">source</font></a>'
         return Paragraph(text, sub if line.level else body, bulletText="\u2022" if line.level == 0 else "\u2013")
 
-    head_cells: list = [Paragraph(escape(sheet.title), title)]
+    head_cells: list = [[Paragraph(escape(sheet.title), title), Paragraph(escape(sheet.info_line), info)]]
     logo = None
     if sheet.logo_bytes:
         try:

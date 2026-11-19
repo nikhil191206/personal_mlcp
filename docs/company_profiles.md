@@ -82,22 +82,25 @@ register refuses (for example Ingersoll Rand) is not read, and the profile says 
 
 ## Task 10. Company reports
 
-One PDF (landscape A4) and/or PowerPoint (16:9) per company.
-
-**Page 1 is the company profile sheet**, in Atlas Copco's market-intelligence format: the company name as the
-title, the logo top right (a dashed LOGO box when there is none), and six labelled boxes:
+One page per company, as a PDF (one landscape A4 page) and/or PowerPoint (one 16:9 slide), in Atlas Copco's
+market-intelligence format and nothing else: the company name as the title, the logo top right (a dashed
+LOGO box when there is none), a line under the title with the report date and the company contact (role
+emails and main phone numbers), and six labelled boxes:
 
 | Left column | Right column |
 |---|---|
 | Business Description and Ownership structure: office address, ownership / partnership / investment / leadership news | Products, markets and finances: products named, technologies, regions, figures stated in the news |
 | Technology/ Product/ Service Description: technology facts and the pages' own summaries | Technology assessment by Atlas Copco: the evidence (items, confirmed, how, types of news, dates) |
-| Value for Atlas Copco: the fixed "why it matters" sentence per type of news | Links and attachments: website, top news links, company contacts, patents |
+| Value for Atlas Copco: the fixed "why it matters" sentence per type of news | Links and attachments: website, top news links, patents |
 
 Nothing is invented. Fields the sources do not give (founded, employees, revenue, unit cost, capacity,
-customers, patents) say "not stated in the collected sources (to complete)" so the analyst can fill them in on
-the editable slide. Facts not yet confirmed carry a `*`, and every fact has a "source" link. The two judgement
-boxes are marked "To complete by Atlas Copco". Each box keeps only as many lines as fit
-(`atlas/report/company_sheet.py`, `CAPACITY`).
+customers, patents, and the contact when none was found) say "not stated in the collected sources (to
+complete)" so the analyst can fill them in on the editable slide. Facts not yet confirmed carry a `*`, and
+every fact has a "source" link. The two judgement boxes are marked "To complete by Atlas Copco". Each box
+keeps only as many lines as fit (`atlas/report/company_sheet.py`, `CAPACITY`), and the PDF builder refuses
+to write a report that runs onto a second page.
 
-The pages after it are the evidence: at a glance, contact details with status, news and facts with each item's
-validation, logo and image links, sources, and the validation rules.
+The report date is the run's date (from the run id). The full evidence (every item with its validation,
+contacts with status, image links, sources) is not in the report; it stays in
+`companies/<run_id>/<company_id>.json` and on the Companies page. The slide's speaker notes list the source
+links.
