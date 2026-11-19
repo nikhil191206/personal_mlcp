@@ -47,3 +47,13 @@ as findings and do not cause a non-zero exit.
 Final run `20261115T192521Z` (empty prefix, so the real demo folders): 10 sources read (5 registered, 5 found and
 vetted by the scout engine), 63 items passed the filter, 6 sources refused and shown, Ingersoll Rand switching
 tried (no coverage found in the pages read), 0 errors. Reports: `reports/report_20261115T192521Z.pptx` and `.pdf`.
+
+## Phase 3 (company view)
+
+- `python -m atlas.companies --fetch-profiles --reports both` builds one profile and one report per company
+  (contacts, logo, images, Confirmed / Not confirmed items). A normal run already writes `companies/<run>/index.json`.
+- The website has a new Companies page.
+- Docs: `docs/architecture.md` (diagrams and workflow), `docs/company_profiles.md` (rules and commands),
+  `docs/scraping_tools_evaluation.md`, `docs/research_blocked_sites_and_agents.md` (proposals, not built).
+- Optional discovery through the official Firecrawl search API: `FIRECRAWL_API_KEY` in `.env` and
+  `search_api_enabled: true` in the settings.

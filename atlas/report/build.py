@@ -195,6 +195,8 @@ def check_personal_data(envelope: OutputEnvelope) -> None:
             for v in values:
                 if not isinstance(v, str):
                     continue
+                if name.endswith("url") and v.startswith(("http://", "https://")) and "@" not in v.split("/")[2]:
+                    continue  # a web address ("logo@2x.png" in a path is not an email); user@host is still caught
                 if _EMAIL.search(v):
                     raise PersonalDataError(f"item {item.id}: field '{name}' looks like it holds an email address")
                 if not name.endswith("url") and _PHONE.search(v):

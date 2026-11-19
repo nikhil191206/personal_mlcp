@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     # Developers set e.g. "dev/ragini" so test runs never touch the demo folders.
     atlas_path_prefix: str = ""
 
+    # Phase 3, optional: the official Firecrawl search API for source discovery (results only).
+    firecrawl_api_key: SecretStr | None = None
+
     @property
     def volume_root(self) -> str:
         root = f"/Volumes/{self.databricks_catalog}/{self.databricks_schema}/{self.databricks_volume}"

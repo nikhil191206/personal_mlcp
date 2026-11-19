@@ -11,7 +11,7 @@ from atlas.settings import get_settings
 
 # The first six are phase 1. settings/ = saved ScoutSettings and Candidate decisions, scout/ = discovered
 # candidates, reports/ = generated PDF and PPTX files.
-FOLDERS = ["source_register", "raw", "clean", "facts", "output", "logs", "settings", "scout", "reports"]
+FOLDERS = ["source_register", "raw", "clean", "facts", "output", "logs", "settings", "scout", "reports", "companies"]
 
 
 @lru_cache

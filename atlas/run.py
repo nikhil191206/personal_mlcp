@@ -427,7 +427,21 @@ def main(argv: list[str] | None = None) -> int:
         valid = False
         log.errors.append(f"output validation failed: {exc}")
     if valid:
+        # Phase 3: every item gets Confirmed / Not confirmed (atlas.validate), and the company-wise index is
+        # written (atlas.companies). Websites are not read here: python -m atlas.companies --fetch-profiles.
+        try:
+            from atlas.companies import build_index
+            index, validated = build_index(envelope, decisions)
+            envelope = envelope.model_copy(update={"items": validated})
+            confirmed = sum(1 for i in validated if i.validation and i.validation.status == "confirmed")
+            log.notes.append(f"validation: {confirmed} of {len(validated)} item(s) confirmed; "
+                             f"{len(index.companies)} company(ies)")
+        except Exception as exc:
+            index = None
+            log.errors.append(f"validation / company index: {type(exc).__name__}: {exc}")
         put(f"output/poc_{run_id}.json", envelope.model_dump(mode="json"))
+        if index is not None:
+            put(f"companies/{run_id}/index.json", index.model_dump(mode="json"))
 
     log.finished_at = utc_now_iso()
     put(f"logs/{run_id}.json", log.model_dump(mode="json"))

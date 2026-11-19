@@ -329,3 +329,8 @@ table.data td.fact { max-width: 520px; }
   .gradient-text, .spinner { animation: none; }
   .card.hover, .card.hover:hover { transition: none; transform: none; }
 }
+
+/* Companies page (phase 3) */
+.company-logo { width: 44px; height: 44px; object-fit: contain; border-radius: 8px; background: #fff; padding: 4px; flex: none; }
+.company-logo.placeholder { display: grid; place-items: center; background: var(--color-surface-2, rgba(255,255,255,0.08)); color: inherit; font-weight: 600; }
+h3.sub { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.7; margin: 14px 0 6px; }

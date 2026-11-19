@@ -35,6 +35,7 @@ from atlas.compliance import load_register  # noqa: E402
 from atlas.models import EventType, OutputEnvelope, ScoutSettings  # noqa: E402
 from atlas.report.brief import brief_path, write_brief  # noqa: E402
 from atlas.scout import settings_store  # noqa: E402
+from atlas.models import CompanyIndex  # noqa: E402
 
 RUN_FILE = re.compile(r"^poc_([0-9]{8}T[0-9]{6}Z)\.json$")
 MIME = {"pdf": "application/pdf",
@@ -214,6 +215,58 @@ async def report(request: Request) -> Response:
                     headers={"Content-Disposition": f'attachment; filename="brief_{run_id}.{fmt}"'})
 
 
+def company_index(run_id: str) -> tuple[CompanyIndex, list]:
+    """The stored company index of a run (it has the website profiles if `atlas.companies --fetch-profiles`
+    was run), else one built now from the run's output. Items always come back validated."""
+    from atlas.companies import build_index
+    try:
+        decisions = review.load_fact_decisions()
+    except Exception:
+        decisions = {}
+    built, items = build_index(envelope(run_id), decisions)
+    path = f"companies/{run_id}/index.json"
+    try:
+        if storage.exists(path):
+            stored = CompanyIndex.model_validate(storage.read_json(path))
+            by_id = {p.company_id: p for p in stored.companies}
+            # keep the website parts (contacts, logo, images) from the stored copy, the counts from now
+            built.companies = [p.model_copy(update={k: getattr(by_id[p.company_id], k) for k in
+                                                    ("website", "contacts", "logo", "images", "profile_status", "profile_fetched_at")})
+                               if p.company_id in by_id else p for p in built.companies]
+    except Exception:
+        pass
+    return built, items
+
+
+async def companies(request: Request) -> JSONResponse:
+    run_id = request.path_params["run_id"]
+    if not re.fullmatch(r"[0-9]{8}T[0-9]{6}Z", run_id):
+        return error("Not a run id.", status=400)
+    try:
+        index, items = company_index(run_id)
+    except Exception as exc:
+        return error(f"The companies of run {run_id} could not be built.", exc)
+    return JSONResponse({"index": index.model_dump(mode="json"),
+                         "items": {i.id: i.model_dump(mode="json") for i in items}})
+
+
+async def company_report(request: Request) -> Response:
+    run_id, cid, fmt = request.path_params["run_id"], request.path_params["company_id"], request.path_params["fmt"]
+    if fmt not in MIME or not re.fullmatch(r"[0-9]{8}T[0-9]{6}Z", run_id) or not re.fullmatch(r"[a-z0-9-]{1,80}", cid):
+        return error("Unknown run, company or format.", status=400)
+    try:
+        from atlas.report.company_report import company_report_path, write_company_report
+        index, items = company_index(run_id)
+        write_company_report(run_id, cid, fmt, index=index, items=items)
+        data = storage.read_bytes(company_report_path(run_id, cid, fmt))
+    except KeyError as exc:
+        return error("No such company in this run.", exc, 404)
+    except Exception as exc:
+        return error("The company report could not be built.", exc)
+    return Response(data, media_type=MIME[fmt],
+                    headers={"Content-Disposition": f'attachment; filename="{cid}_{run_id}.{fmt}"'})
+
+
 app = Starlette(routes=[
     Route("/api/health", health),
     Route("/api/runs", runs),
@@ -226,6 +279,8 @@ app = Starlette(routes=[
     Route("/api/sources", sources_post, methods=["POST"]),
     Route("/api/rerun", rerun_status),
     Route("/api/reports/{run_id}/{fmt}", report, methods=["POST"]),
+    Route("/api/companies/{run_id}", companies),
+    Route("/api/companies/{run_id}/{company_id}/report/{fmt}", company_report, methods=["POST"]),
 ])
 
 if __name__ == "__main__":

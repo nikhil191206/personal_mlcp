@@ -2,13 +2,14 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { api } from "./api.js";
 import { runLabel, useAsync } from "./lib.js";
-import { IconFacts, IconFilters, IconMoon, IconOverview, IconReport, IconSearch, IconSources, IconSun } from "./components/icons.jsx";
+import { IconCompanies, IconFacts, IconFilters, IconMoon, IconOverview, IconReport, IconSearch, IconSources, IconSun } from "./components/icons.jsx";
 import Overview from "./pages/Overview.jsx";
 import Search from "./pages/Search.jsx";
 import Facts from "./pages/Facts.jsx";
 import Sources from "./pages/Sources.jsx";
 import Filters from "./pages/Filters.jsx";
 import Report from "./pages/Report.jsx";
+import Companies from "./pages/Companies.jsx";
 
 const ScoutContext = createContext(null);
 export const useScout = () => useContext(ScoutContext);
@@ -17,6 +18,7 @@ const PAGES = [
   { path: "/", label: "Overview", icon: IconOverview, element: <Overview /> },
   { path: "/search", label: "Search", icon: IconSearch, element: <Search /> },
   { path: "/facts", label: "Facts", icon: IconFacts, element: <Facts /> },
+  { path: "/companies", label: "Companies", icon: IconCompanies, element: <Companies /> },
   { path: "/sources", label: "Sources", icon: IconSources, element: <Sources /> },
   { path: "/filters", label: "Filters", icon: IconFilters, element: <Filters /> },
   { path: "/report", label: "Report", icon: IconReport, element: <Report /> },
