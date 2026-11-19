@@ -7,10 +7,13 @@ Set ATLAS_REPO if the repo is not at ../personal_mlcp.
 """
 from __future__ import annotations
 
+import base64
 import os
 import re
+import secrets
 import sys
 import threading
+import time
 import typing
 from pathlib import Path
 
@@ -24,8 +27,11 @@ os.chdir(REPO)  # config/ paths and the rerun subprocess expect the repo folder
 
 from pydantic import ValidationError  # noqa: E402
 from starlette.applications import Starlette  # noqa: E402
+from starlette.middleware import Middleware  # noqa: E402
+from starlette.middleware.base import BaseHTTPMiddleware  # noqa: E402
+from starlette.middleware.trustedhost import TrustedHostMiddleware  # noqa: E402
 from starlette.requests import Request  # noqa: E402
-from starlette.responses import JSONResponse, Response  # noqa: E402
+from starlette.responses import FileResponse, JSONResponse, Response  # noqa: E402
 from starlette.routing import Route  # noqa: E402
 
 from app.lib.settings_ui import load_technology_labels  # noqa: E402
@@ -267,7 +273,91 @@ async def company_report(request: Request) -> Response:
                     headers={"Content-Disposition": f'attachment; filename="{cid}_{run_id}.{fmt}"'})
 
 
-app = Starlette(routes=[
+# ---------- one-process mode: this server also serves the built website (`npm start`) ----------
+
+SERVE = os.environ.get("SCOUT_SERVE") == "1"
+DIST = WEB / "dist"
+HOST = os.environ.get("SCOUT_HOST", "127.0.0.1")
+PUBLIC = HOST not in ("127.0.0.1", "localhost")  # listening beyond this laptop (a cloud host)
+if SERVE and PUBLIC and not os.environ.get("SCOUT_PASSWORD"):
+    sys.exit("Refusing to start on a public address without SCOUT_PASSWORD. Set a strong password first.")
+PASSWORD = (os.environ.get("SCOUT_PASSWORD") or secrets.token_urlsafe(9)) if SERVE else None
+ALLOWED_HOSTS = ["127.0.0.1", "localhost"] + [h.strip() for h in os.environ.get("SCOUT_ALLOWED_HOSTS", "").split(",") if h.strip()]
+if os.environ.get("RENDER_EXTERNAL_HOSTNAME"):  # Render sets this to the service's public name
+    ALLOWED_HOSTS.append(os.environ["RENDER_EXTERNAL_HOSTNAME"])
+
+# Failed logins per client address in the last 10 minutes; 10 failures blocks that address for the rest of the window.
+_failures: dict[str, list[float]] = {}
+WINDOW_S, MAX_FAILURES = 600, 10
+
+
+def client_ip(request: Request) -> str:
+    # Behind the host's proxy the LAST address in X-Forwarded-For is the one the proxy itself saw; earlier ones can be
+    # forged by the client, so they are not used.
+    forwarded = request.headers.get("x-forwarded-for", "")
+    return (forwarded.split(",")[-1].strip() if forwarded else (request.client.host if request.client else "?")) or "?"
+
+
+async def healthz(_: Request) -> JSONResponse:
+    return JSONResponse({"ok": True})
+
+
+async def site(request: Request) -> Response:
+    """Static files from dist/, and index.html for any page route (the site does its own routing)."""
+    rel = request.path_params.get("path", "")
+    target = (DIST / rel).resolve()
+    if rel and DIST.resolve() in target.parents and target.is_file():
+        return FileResponse(target)
+    return FileResponse(DIST / "index.html")
+
+
+class Guard(BaseHTTPMiddleware):
+    """Blocks requests from other web pages, and asks for the password in one-process mode.
+
+    - A POST must be JSON. A page on another site cannot send JSON to us without our permission, so this stops a
+      malicious page from making our logged-in browser save settings or start a run.
+    - If the browser sends an Origin header, it must be this server's own address.
+    - With SCOUT_SERVE=1 every request needs the password (HTTP Basic; any user name).
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        if request.url.path == "/healthz":  # for the host's health check; reveals nothing
+            return await call_next(request)
+        if request.method == "POST":
+            if not request.headers.get("content-type", "").startswith("application/json"):
+                return JSONResponse({"error": "Requests must be JSON.", "detail": ""}, status_code=415)
+        origin = request.headers.get("origin")
+        if origin and origin.split("://", 1)[-1] != request.headers.get("host", ""):
+            return JSONResponse({"error": "Request from another site refused.", "detail": ""}, status_code=403)
+        if PASSWORD is not None:
+            ip, now = client_ip(request), time.time()
+            recent = [t for t in _failures.get(ip, []) if now - t < WINDOW_S]
+            _failures[ip] = recent
+            if len(recent) >= MAX_FAILURES:
+                return Response("Too many wrong passwords. Try again in a few minutes.", status_code=429)
+            sent = ""
+            header = request.headers.get("authorization", "")
+            if header.lower().startswith("basic "):
+                try:
+                    sent = base64.b64decode(header[6:]).decode("utf-8", "replace").partition(":")[2]
+                except Exception:
+                    sent = ""
+            if not secrets.compare_digest(sent.encode(), PASSWORD.encode()):
+                if header:  # a wrong password counts; the first prompt with no credentials does not
+                    _failures[ip].append(now)
+                return Response("Password required.", status_code=401,
+                                headers={"WWW-Authenticate": 'Basic realm="Market Scout"'})
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        if request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-store"
+        return response
+
+
+routes = [
+    Route("/healthz", healthz),
     Route("/api/health", health),
     Route("/api/runs", runs),
     Route("/api/runs/{run_id}", run_detail),
@@ -281,10 +371,23 @@ app = Starlette(routes=[
     Route("/api/reports/{run_id}/{fmt}", report, methods=["POST"]),
     Route("/api/companies/{run_id}", companies),
     Route("/api/companies/{run_id}/{company_id}/report/{fmt}", company_report, methods=["POST"]),
-])
+]
+if SERVE:
+    if not (DIST / "index.html").is_file():
+        sys.exit("The website is not built. Run `npm run build` in web/ first (or use `npm start`).")
+    routes += [Route("/", site), Route("/{path:path}", site)]
+
+middleware = [Middleware(TrustedHostMiddleware, allowed_hosts=ALLOWED_HOSTS), Middleware(Guard)]
+app = Starlette(routes=routes, middleware=middleware)
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("SCOUT_API_PORT", "8765"))
-    print(f"Market Scout API on http://127.0.0.1:{port} (repo: {REPO}, prefix: {prefix() or 'DEMO FOLDERS'})", flush=True)
-    uvicorn.run(app, host="127.0.0.1", port=port, log_level="warning")
+    port = int(os.environ.get("PORT") or os.environ.get("SCOUT_API_PORT", "8765"))
+    print(f"Market Scout API on http://{HOST}:{port} (repo: {REPO}, prefix: {prefix() or 'DEMO FOLDERS'})", flush=True)
+    if SERVE and not PUBLIC:
+        print(f"\n  OPEN  http://127.0.0.1:{port}\n  LOGIN user: scout   password: {PASSWORD}\n"
+              "  (local only; set SCOUT_PASSWORD to choose your own)\n", flush=True)
+    elif SERVE:
+        print("Serving the website with a password (the password is not printed). "
+              f"Allowed host names: {', '.join(ALLOWED_HOSTS)}", flush=True)
+    uvicorn.run(app, host=HOST, port=port, log_level="warning", proxy_headers=True, forwarded_allow_ips="*")

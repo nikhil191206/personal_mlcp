@@ -1,0 +1,17 @@
+# Never put secrets, local environments or other people's work into the image.
+.env
+.env.*
+!.env.example
+.venv
+.git
+.gitignore
+.pytest_cache
+__pycache__
+*.pyc
+.agents
+.claude
+ui
+tests
+docs/images
+web/node_modules
+web/dist

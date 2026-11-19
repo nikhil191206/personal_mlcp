@@ -1,7 +1,7 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useScout } from "../App.jsx";
-import { countBy, isClientItem, nice, searchItems, shortDate } from "../lib.js";
+import { countBy, isClientItem, nice, runLabel, searchItems, shortDate } from "../lib.js";
 import { Async, Badge, Empty, PageHead, SourceLink } from "../components/ui.jsx";
 import { IconSearch } from "../components/icons.jsx";
 
@@ -30,11 +30,23 @@ function Result({ item }) {
 export default function Search() {
   const { envelope } = useScout();
   const [params, setParams] = useSearchParams();
-  const q = params.get("q") || "";
   const event = params.get("event") || "";
   const label = params.get("label") || "";
+  // The box keeps its own text, so typing never waits on the page address; the address follows after a short pause.
+  const [q, setQ] = useState(params.get("q") || "");
+  const paramsRef = useRef(params);
+  paramsRef.current = params;
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const next = new URLSearchParams(paramsRef.current);
+      q ? next.set("q", q) : next.delete("q");
+      if (next.toString() !== paramsRef.current.toString()) setParams(next, { replace: true });
+    }, 300);
+    return () => clearTimeout(t);
+  }, [q]); // eslint-disable-line react-hooks/exhaustive-deps
   const set = (key, value) => {
-    const next = new URLSearchParams(params);
+    if (key === "q") { setQ(value); return; }
+    const next = new URLSearchParams(paramsRef.current);
     value ? next.set(key, value) : next.delete(key);
     setParams(next, { replace: true });
   };
@@ -81,6 +93,8 @@ function Results({ env, q, event, label, set }) {
       </div>
       <p style={{ fontSize: 13 }}>
         {results.length} result{results.length === 1 ? "" : "s"}{results.length > LIMIT ? `, showing the newest ${LIMIT}` : ""}
+        {" "}· searching {items.length} facts from the run of {runLabel(env.run_id)}
+        {items.length < 20 && <strong style={{ color: "var(--color-warning)" }}> (a small run: choose another in the top bar)</strong>}
       </p>
       {results.length ? (
         <div className="list">{results.slice(0, LIMIT).map((i) => <Result key={i.id} item={i} />)}</div>

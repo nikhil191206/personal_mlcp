@@ -1,0 +1,25 @@
+# Render Blueprint for the Market Scout website and backend (one Docker web service).
+# Secret values are NOT in this file: Render asks for them when the Blueprint is created (sync: false).
+services:
+  - type: web
+    name: market-scout
+    runtime: docker
+    plan: starter            # a free instance has too little memory for the pipeline's language model
+    healthCheckPath: /healthz
+    envVars:
+      - key: DATABRICKS_HOST
+        sync: false
+      - key: DATABRICKS_TOKEN
+        sync: false
+      - key: DATABRICKS_CATALOG
+        value: atlas_poc
+      - key: DATABRICKS_SCHEMA
+        value: default
+      - key: DATABRICKS_VOLUME
+        value: data
+      - key: CONTACT_EMAIL
+        sync: false
+      - key: ATLAS_PATH_PREFIX
+        sync: false           # dev/<name> for a sandbox, empty for the real demo folders
+      - key: SCOUT_PASSWORD
+        sync: false           # the site's login password (user name: scout); choose a long one

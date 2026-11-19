@@ -5,6 +5,7 @@
   "type": "module",
   "description": "Market Scout website for the Atlas Copco PoC. `npm run dev` starts the local API and the site.",
   "scripts": {
+    "start": "node scripts/start.mjs",
     "dev": "node scripts/dev.mjs",
     "dev:web": "vite",
     "dev:api": "node scripts/dev.mjs --api-only",
