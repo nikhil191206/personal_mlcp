@@ -382,7 +382,12 @@ app = Starlette(routes=routes, middleware=middleware)
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("PORT") or os.environ.get("SCOUT_API_PORT", "8765"))
+    for stream in (sys.stdout, sys.stderr):  # a folder name with non-Latin letters must not crash the start-up message
+        try:
+            stream.reconfigure(errors="replace")
+        except Exception:
+            pass
+    port =int(os.environ.get("PORT") or os.environ.get("SCOUT_API_PORT", "8765"))
     print(f"Market Scout API on http://{HOST}:{port} (repo: {REPO}, prefix: {prefix() or 'DEMO FOLDERS'})", flush=True)
     if SERVE and not PUBLIC:
         print(f"\n  OPEN  http://127.0.0.1:{port}\n  LOGIN user: scout   password: {PASSWORD}\n"
