@@ -51,6 +51,8 @@ function CompanyCard({ profile, items, runId }) {
           </div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
+          <a className="btn btn-sm btn-secondary" href={`/view/${encodeURIComponent(runId)}/${encodeURIComponent(profile.company_id)}`}
+             target="_blank" rel="noopener noreferrer">View</a>
           <button className="btn btn-sm btn-secondary" disabled={!!busy} onClick={() => report("pdf")}>{busy === "pdf" ? "Building..." : "PDF"}</button>
           <button className="btn btn-sm btn-secondary" disabled={!!busy} onClick={() => report("pptx")}>{busy === "pptx" ? "Building..." : "PowerPoint"}</button>
           <button className="btn btn-sm btn-primary" onClick={() => setOpen(!open)}>{open ? "Hide" : "Details"}</button>

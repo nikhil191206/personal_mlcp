@@ -334,3 +334,21 @@ table.data td.fact { max-width: 520px; }
 .company-logo { width: 44px; height: 44px; object-fit: contain; border-radius: 8px; background: #fff; padding: 4px; flex: none; }
 .company-logo.placeholder { display: grid; place-items: center; background: var(--color-surface-2, rgba(255,255,255,0.08)); color: inherit; font-weight: 600; }
 h3.sub { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.7; margin: 14px 0 6px; }
+
+/* One-page company report in its own tab (pages/ReportView.jsx): the page image with clickable source links on top */
+.report-view { flex: 1; min-width: 0; min-height: 100vh; background: #e9ecee; padding: 16px; font-family: var(--font-sans); }
+.report-view-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; max-width: 1400px; margin: 0 auto 12px; color: #333; font-size: 13px; }
+.report-view-page { max-width: 1400px; margin: 0 auto; color: #333; }
+.report-sheet { position: relative; margin: 0 auto; background: #fff; box-shadow: 0 2px 12px rgba(0, 0, 0, 0.18); }
+.report-sheet canvas { display: block; }
+.report-sheet a { position: absolute; display: block; }
+.report-sheet a:hover { background: rgba(0, 114, 178, 0.12); outline: 1px solid rgba(0, 114, 178, 0.5); }
+
+/* One-page company report in its own tab (pages/ReportView.jsx): the page image with clickable source links on top */
+.report-view { flex: 1; min-width: 0; min-height: 100vh; background: #e9ecee; padding: 16px; font-family: var(--font-sans); }
+.report-view-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; max-width: 1400px; margin: 0 auto 12px; color: #333; font-size: 13px; }
+.report-view-page { max-width: 1400px; margin: 0 auto; color: #333; }
+.report-sheet { position: relative; margin: 0 auto; background: #fff; box-shadow: 0 2px 12px rgba(0, 0, 0, 0.18); }
+.report-sheet canvas { display: block; }
+.report-sheet a { position: absolute; display: block; }
+.report-sheet a:hover { background: rgba(0, 114, 178, 0.12); outline: 1px solid rgba(0, 114, 178, 0.5); }
